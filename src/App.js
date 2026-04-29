@@ -975,7 +975,130 @@ function AuthScreen({onLogin}) {
   );
 }
 
-export default function App() {
+/* ── Admin Panel ─────────────────────────────── */
+function AdminPanel({onClose}) {
+  const [users,setUsers]=useState([]);
+  const [loading,setLoading]=useState(true);
+  const [selectedUser,setSelectedUser]=useState(null);
+  const [beanAmount,setBeanAmount]=useState("");
+  const [beanType,setBeanType]=useState("purchased");
+  const [done,setDone]=useState("");
+  const [search,setSearch]=useState("");
+
+  useEffect(()=>{
+    async function load(){
+      const {data}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
+      if(data) setUsers(data);
+      setLoading(false);
+    }
+    load();
+  },[]);
+
+  async function handleGiveBeans(){
+    if(!selectedUser||!beanAmount||parseInt(beanAmount)<=0) return;
+    const amount=parseInt(beanAmount);
+    const col=beanType==="purchased"?"purchased_beans":"earned_beans";
+    const current=selectedUser[col]||0;
+    await supabase.from("profiles").update({[col]:current+amount}).eq("id",selectedUser.id);
+    await supabase.from("bean_transactions").insert({
+      user_id:selectedUser.id,
+      type:"charge",
+      amount,
+      description:`관리자 지급 (${beanType==="purchased"?"구매빈":"수익빈"})`,
+    });
+    setDone(`✅ ${selectedUser.email}에게 ${beanType==="purchased"?"구매빈":"수익빈"} ${amount}빈 지급 완료!`);
+    setUsers(us=>us.map(u=>u.id===selectedUser.id?{...u,[col]:current+amount}:u));
+    setSelectedUser(u=>({...u,[col]:current+amount}));
+    setBeanAmount("");
+  }
+
+  const filtered=users.filter(u=>u.email?.includes(search)||u.name?.includes(search));
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
+      <div style={{background:T.bg,borderRadius:16,padding:"28px",maxWidth:620,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(28,20,16,0.3)"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:22}}>
+          <div>
+            <div style={{fontSize:10,color:T.coffee,fontWeight:600,letterSpacing:"2px",marginBottom:4}}>ADMIN ONLY</div>
+            <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.heading,fontWeight:400}}>관리자 패널</h2>
+          </div>
+          <button onClick={onClose} style={{background:T.tag,border:"none",borderRadius:20,padding:"6px 14px",fontSize:13,color:T.body,cursor:"pointer"}}>닫기</button>
+        </div>
+
+        {/* Stats */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
+          {[
+            {label:"총 가입자",value:`${users.length}명`},
+            {label:"인증 완료",value:`${users.filter(u=>u.verified).length}명`},
+            {label:"오늘 가입",value:`${users.filter(u=>new Date(u.created_at).toDateString()===new Date().toDateString()).length}명`},
+          ].map(s=>(
+            <div key={s.label} style={{background:T.surface,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`}}>
+              <div style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.coffee,fontWeight:400}}>{s.value}</div>
+              <div style={{fontSize:11,color:T.muted,marginTop:2}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{height:1,background:T.border,marginBottom:20}}/>
+
+        {/* Bean 지급 */}
+        <h3 style={{fontSize:14,fontWeight:600,color:T.heading,marginBottom:14}}>🫘 빈 지급</h3>
+
+        {/* Search */}
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 또는 이메일 검색"
+          style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 13px",fontSize:13,color:T.heading,outline:"none",boxSizing:"border-box",marginBottom:10}}
+          onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+
+        {/* User list */}
+        <div style={{maxHeight:180,overflowY:"auto",border:`1px solid ${T.border}`,borderRadius:8,marginBottom:14}}>
+          {loading?(
+            <div style={{padding:"16px",textAlign:"center",color:T.muted,fontSize:13}}>불러오는 중…</div>
+          ):filtered.map(u=>(
+            <div key={u.id} onClick={()=>setSelectedUser(u)} style={{
+              padding:"10px 14px",cursor:"pointer",
+              background:selectedUser?.id===u.id?T.tag:"none",
+              borderBottom:`1px solid ${T.border}`,
+              display:"flex",justifyContent:"space-between",alignItems:"center",
+              transition:"background 0.1s",
+            }}>
+              <div>
+                <div style={{fontSize:13,fontWeight:selectedUser?.id===u.id?600:400,color:T.heading}}>{u.name||"이름없음"}</div>
+                <div style={{fontSize:11,color:T.muted}}>{u.email}</div>
+              </div>
+              <div style={{fontSize:11,color:T.muted,textAlign:"right"}}>
+                <div>🫘 {u.purchased_beans||0}</div>
+                <div style={{color:T.drip,display:"flex",alignItems:"center",gap:2}}><DripIcon size={10}/> {u.earned_beans||0}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {selectedUser&&(
+          <div style={{background:T.surface,borderRadius:10,padding:"14px 16px",marginBottom:14,border:`1px solid ${T.border}`}}>
+            <div style={{fontSize:13,fontWeight:600,color:T.heading,marginBottom:10}}>
+              {selectedUser.name} ({selectedUser.email}) 에게 빈 지급
+            </div>
+            <div style={{display:"flex",gap:8,marginBottom:8}}>
+              <button onClick={()=>setBeanType("purchased")} style={{flex:1,background:beanType==="purchased"?T.coffee:T.tag,border:"none",borderRadius:7,padding:"8px",fontSize:12,fontWeight:600,color:beanType==="purchased"?"#fff":T.tagText,cursor:"pointer"}}>🫘 구매빈</button>
+              <button onClick={()=>setBeanType("earned")} style={{flex:1,background:beanType==="earned"?T.coffee:T.tag,border:"none",borderRadius:7,padding:"8px",fontSize:12,fontWeight:600,color:beanType==="earned"?"#fff":T.tagText,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:4}}><DripIcon size={12} color={beanType==="earned"?"#fff":T.coffee}/> 수익빈</button>
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <input type="number" value={beanAmount} onChange={e=>setBeanAmount(e.target.value)} placeholder="지급할 빈 수"
+                style={{flex:1,border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 13px",fontSize:13,color:T.heading,outline:"none"}}
+                onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+              <button onClick={handleGiveBeans} disabled={!beanAmount||parseInt(beanAmount)<=0} style={{background:beanAmount&&parseInt(beanAmount)>0?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px 18px",color:beanAmount&&parseInt(beanAmount)>0?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:"pointer"}}>지급</button>
+            </div>
+            {done&&<div style={{marginTop:8,fontSize:12,color:T.green,fontWeight:500}}>{done}</div>}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
   // 결제 성공/실패 페이지 라우팅
   const path = window.location.pathname;
   if (path === "/payment/success") return <PaymentSuccess/>;
@@ -1035,6 +1158,7 @@ function MainApp({user}) {
   const [qaList,setQaList]=useState([]);
   const [loading,setLoading]=useState(true);
   const [askModal,setAskModal]=useState(false);
+  const [isAdmin,setIsAdmin]=useState(false);
 
   const [purchasedBeans,setPurchasedBeans]=useState(0);
   const [earnedBeans,setEarnedBeans]=useState(0);
@@ -1047,6 +1171,7 @@ function MainApp({user}) {
   const [withdrawModal,setWithdrawModal]=useState(false);
   const [signupModal,setSignupModal]=useState(false);
   const [revRegModal,setRevRegModal]=useState(false);
+  const [adminModal,setAdminModal]=useState(false);
 
   const [filter,setFilter]=useState("전체");
   const [viewCount,setViewCount]=useState(0);
@@ -1066,6 +1191,7 @@ function MainApp({user}) {
           setUserVerified(profile.verified||false);
           setBankAccount(profile.bank_account||"");
           setViewCount(profile.view_count||0);
+          setIsAdmin(profile.is_admin||false);
         }
 
         // 커피챗 프로필
@@ -1230,6 +1356,12 @@ function MainApp({user}) {
             <div style={{width:28,height:28,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,fontFamily:"'Noto Serif KR',serif",flexShrink:0,marginLeft:2}}>
               {user?.kakao ? user.email.split("@")[0][0].toUpperCase() : user?.name?.[0]||"U"}
             </div>
+            {/* 관리자 버튼 — Jake만 보임 */}
+            {isAdmin&&(
+              <button onClick={()=>setAdminModal(true)} style={{background:T.coffee,border:"none",borderRadius:20,padding:"5px 12px",fontSize:11,color:"#fff",fontWeight:600,cursor:"pointer",letterSpacing:"0.5px"}}>
+                ⚙️ 관리
+              </button>
+            )}
           </div>
         </div>
 
@@ -1315,6 +1447,7 @@ function MainApp({user}) {
       {signupModal  &&<SignupModal onClose={()=>setSignupModal(false)} onComplete={handleSignupComplete}/>}
       {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);}}/>}
       {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} totalBeans={totalBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
+      {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
     </div>
   );
 }
