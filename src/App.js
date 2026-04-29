@@ -1308,6 +1308,7 @@ function AdminPanel({onClose}) {
 }
 
 
+export default function App() {
   // 결제 성공/실패 페이지 라우팅
   const path = window.location.pathname;
   if (path === "/payment/success") return <PaymentSuccess/>;
