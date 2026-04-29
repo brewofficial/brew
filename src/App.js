@@ -457,7 +457,7 @@ function ProfileCard({p,onUnlock,onSend,totalBeans,viewCount,index}) {
                 {p.verified&&<span style={{color:T.green,marginLeft:4}}>✓ 인증 회원은 답장 확률이 높아요.</span>}
               </div>
               <div style={{display:"flex",gap:7}}>
-                <button onClick={()=>{onSend();setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 5빈</button>
+                <button onClick={()=>{const ok=onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 5빈</button>
                 <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
               </div>
             </div>
@@ -1116,8 +1116,9 @@ function MainApp({user}) {
   }
 
   function handleSend(){
-    if(totalBeans<BEANS_PER_SEND){setBeanModal(true);return;}
+    if(totalBeans<BEANS_PER_SEND){setBeanModal(true);return false;}
     spendBeans(BEANS_PER_SEND);
+    return true;
   }
 
   function handleReviewReq(price){ spendBeans(price); }
