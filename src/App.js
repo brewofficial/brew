@@ -975,6 +975,162 @@ function AuthScreen({onLogin}) {
   );
 }
 
+/* ── My Page ─────────────────────────────────── */
+function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
+  const [tab,setTab]=useState("beans"); // beans | coffee | resume
+  const [chatHistory]=useState([
+    {id:1,name:"김지수",role:"Product Manager",company:"카카오",date:"2025.04.20",status:"답변대기"},
+    {id:2,name:"오재원",role:"Data Scientist",company:"네이버",date:"2025.04.18",status:"완료"},
+  ]);
+  const [resumeHistory]=useState([
+    {id:1,role:"Product Manager",company:"카카오",date:"2025.04.19",status:"피드백 완료",rating:5},
+    {id:2,role:"Senior Engineer",company:"토스",date:"2025.04.15",status:"검토 중",rating:null},
+  ]);
+
+  const tabStyle=(id)=>({
+    flex:1,background:"none",border:"none",padding:"10px",fontSize:13,
+    fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,
+    cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",
+  });
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"flex-start",justifyContent:"flex-end",zIndex:1000}} onClick={onClose}>
+      <div style={{background:T.bg,height:"100vh",width:"100%",maxWidth:360,overflowY:"auto",boxShadow:"-4px 0 24px rgba(28,20,16,0.15)",display:"flex",flexDirection:"column"}} onClick={e=>e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{background:T.coffee,padding:"32px 24px 24px",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
+            <button onClick={onClose} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>← 닫기</button>
+            <button onClick={async()=>{await supabase.auth.signOut();window.location.reload();}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>로그아웃</button>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:14}}>
+            <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontFamily:"'Noto Serif KR',serif",color:"#fff",fontWeight:600}}>
+              {user?.name?.[0]||"U"}
+            </div>
+            <div>
+              <div style={{color:"#fff",fontWeight:600,fontSize:16}}>{user?.name||"사용자"}</div>
+              <div style={{color:"rgba(255,255,255,0.7)",fontSize:12,marginTop:2}}>{user?.email}</div>
+            </div>
+          </div>
+          {/* 빈 요약 */}
+          <div style={{display:"flex",gap:10,marginTop:18}}>
+            <div style={{flex:1,background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 14px"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginBottom:3}}>구매빈</div>
+              <div style={{fontSize:18,fontWeight:700,color:"#fff"}}>🫘 {purchasedBeans}</div>
+            </div>
+            <div style={{flex:1,background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"10px 14px"}}>
+              <div style={{fontSize:10,color:"rgba(255,255,255,0.6)",marginBottom:3}}>수익빈</div>
+              <div style={{fontSize:18,fontWeight:700,color:"#fff",display:"flex",alignItems:"center",gap:4}}><DripIcon size={16} color="#fff"/> {earnedBeans}</div>
+            </div>
+          </div>
+          {/* 빠른 버튼 */}
+          <div style={{display:"flex",gap:8,marginTop:10}}>
+            <button onClick={()=>{onClose();onCharge();}} style={{flex:1,background:"#fff",border:"none",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:T.coffee,cursor:"pointer"}}>🫘 빈 충전</button>
+            {earnedBeans>0&&<button onClick={()=>{onClose();onWithdraw();}} style={{flex:1,background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer"}}><DripIcon size={12} color="#fff"/> 현금 전환</button>}
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
+          <button style={tabStyle("beans")} onClick={()=>setTab("beans")}>빈 현황</button>
+          <button style={tabStyle("coffee")} onClick={()=>setTab("coffee")}>☕ 커피챗</button>
+          <button style={tabStyle("resume")} onClick={()=>setTab("resume")}>📄 레주메</button>
+        </div>
+
+        {/* Content */}
+        <div style={{flex:1,padding:"20px 24px",overflowY:"auto"}}>
+
+          {/* 빈 현황 */}
+          {tab==="beans"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              <div style={{background:T.surface,borderRadius:10,padding:"16px",border:`1px solid ${T.border}`}}>
+                <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>빈 종류 안내</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7}}>
+                      <span>🫘</span>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:T.heading}}>구매빈</div>
+                        <div style={{fontSize:11,color:T.muted}}>서비스 이용 전용</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.coffee}}>{purchasedBeans}빈</div>
+                  </div>
+                  <div style={{height:1,background:T.border}}/>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{display:"flex",alignItems:"center",gap:7}}>
+                      <DripIcon size={18}/>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</div>
+                        <div style={{fontSize:11,color:T.muted}}>서비스 이용 + 출금 가능</div>
+                      </div>
+                    </div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
+                  </div>
+                  <div style={{height:1,background:T.border}}/>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                    <div style={{fontSize:13,fontWeight:600,color:T.heading}}>합계</div>
+                    <div style={{fontSize:18,fontWeight:700,color:T.heading}}>{purchasedBeans+earnedBeans}빈</div>
+                  </div>
+                </div>
+              </div>
+              {earnedBeans>0&&(
+                <div style={{background:T.dripBg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.coffeeLt}`}}>
+                  <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4}}>
+                    <DripIcon size={13}/> 수익빈 {earnedBeans}빈 = ₩{(earnedBeans*2000).toLocaleString()}
+                  </div>
+                  <div style={{fontSize:12,color:T.muted,marginBottom:10}}>연동 계좌: {bankAccount||"미등록"}</div>
+                  <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>현금으로 전환하기</button>
+                </div>
+              )}
+              <button onClick={()=>{onClose();onCharge();}} style={{width:"100%",background:"none",border:`1px solid ${T.coffee}`,borderRadius:7,padding:"10px",color:T.coffee,fontWeight:600,fontSize:13,cursor:"pointer"}}>🫘 빈 충전하기</button>
+            </div>
+          )}
+
+          {/* 커피챗 내역 */}
+          {tab==="coffee"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:12,color:T.muted,marginBottom:4}}>총 {chatHistory.length}건</div>
+              {chatHistory.map(c=>(
+                <div key={c.id} style={{background:T.surface,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{c.name}</div>
+                      <div style={{fontSize:12,color:T.muted,marginTop:2}}>{c.role} · {c.company}</div>
+                    </div>
+                    <span style={{fontSize:11,padding:"3px 9px",borderRadius:20,fontWeight:600,background:c.status==="완료"?T.greenBg:T.tag,color:c.status==="완료"?T.green:T.tagText}}>{c.status}</span>
+                  </div>
+                  <div style={{fontSize:11,color:T.muted,marginTop:8}}>{c.date} · 5빈 사용</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 레주메 내역 */}
+          {tab==="resume"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:12,color:T.muted,marginBottom:4}}>총 {resumeHistory.length}건</div>
+              {resumeHistory.map(r=>(
+                <div key={r.id} style={{background:T.surface,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{r.role}</div>
+                      <div style={{fontSize:12,color:T.muted,marginTop:2}}>{r.company}</div>
+                    </div>
+                    <span style={{fontSize:11,padding:"3px 9px",borderRadius:20,fontWeight:600,background:r.status==="피드백 완료"?T.greenBg:T.tag,color:r.status==="피드백 완료"?T.green:T.tagText}}>{r.status}</span>
+                  </div>
+                  {r.rating&&<div style={{fontSize:12,color:"#f5a623",marginTop:6}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</div>}
+                  <div style={{fontSize:11,color:T.muted,marginTop:6}}>{r.date}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Admin Panel ─────────────────────────────── */
 function AdminPanel({onClose}) {
   const [users,setUsers]=useState([]);
@@ -1172,6 +1328,7 @@ function MainApp({user}) {
   const [signupModal,setSignupModal]=useState(false);
   const [revRegModal,setRevRegModal]=useState(false);
   const [adminModal,setAdminModal]=useState(false);
+  const [myPageModal,setMyPageModal]=useState(false);
 
   const [filter,setFilter]=useState("전체");
   const [viewCount,setViewCount]=useState(0);
@@ -1352,8 +1509,8 @@ function MainApp({user}) {
             </div>
             <button onClick={()=>setBeanModal(true)} style={{background:T.coffee,border:"none",borderRadius:20,padding:"5px 12px",fontSize:12,color:"#fff",fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>충전</button>
             {earnedBeans>0&&<button onClick={()=>setWithdrawModal(true)} style={{background:T.dripBg,border:`1px solid ${T.coffeeLt}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:T.drip,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>출금</button>}
-            {/* User avatar only */}
-            <div style={{width:28,height:28,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,fontFamily:"'Noto Serif KR',serif",flexShrink:0,marginLeft:2}}>
+            {/* User avatar - 클릭하면 마이페이지 */}
+            <div onClick={()=>setMyPageModal(true)} style={{width:28,height:28,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,fontFamily:"'Noto Serif KR',serif",flexShrink:0,marginLeft:2,cursor:"pointer"}}>
               {user?.kakao ? user.email.split("@")[0][0].toUpperCase() : user?.name?.[0]||"U"}
             </div>
             {/* 관리자 버튼 — Jake만 보임 */}
@@ -1448,6 +1605,7 @@ function MainApp({user}) {
       {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);}}/>}
       {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} totalBeans={totalBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
       {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
+      {myPageModal  &&<MyPage onClose={()=>setMyPageModal(false)} user={user} purchasedBeans={purchasedBeans} earnedBeans={earnedBeans} bankAccount={bankAccount} onWithdraw={()=>setWithdrawModal(true)} onCharge={()=>setBeanModal(true)}/>}
     </div>
   );
 }
