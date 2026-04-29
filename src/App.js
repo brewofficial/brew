@@ -971,18 +971,18 @@ export default function App() {
 
 function MainApp({user}) {
   const [tab,setTab]=useState("chat");
-  const [profiles,setProfiles]=useState(INIT_PROFILES);
-  const [reviewers]=useState(INIT_REVIEWERS);
-  const [qaList,setQaList]=useState(INIT_QA);
+  const [profiles,setProfiles]=useState([]);
+  const [reviewers,setReviewers]=useState([]);
+  const [qaList,setQaList]=useState([]);
+  const [loading,setLoading]=useState(true);
   const [askModal,setAskModal]=useState(false);
 
   const [purchasedBeans,setPurchasedBeans]=useState(0);
   const [earnedBeans,setEarnedBeans]=useState(0);
   const totalBeans=purchasedBeans+earnedBeans;
 
-  // User state
   const [userVerified,setUserVerified]=useState(false);
-  const [bankAccount,setBankAccount]=useState(""); // has completed card+email verification
+  const [bankAccount,setBankAccount]=useState("");
 
   const [beanModal,setBeanModal]=useState(false);
   const [withdrawModal,setWithdrawModal]=useState(false);
@@ -990,55 +990,161 @@ function MainApp({user}) {
   const [revRegModal,setRevRegModal]=useState(false);
 
   const [filter,setFilter]=useState("전체");
+  const [viewCount,setViewCount]=useState(0);
 
+  // ── Supabase 데이터 로드 ──────────────────────
+  useEffect(()=>{
+    if(!user?.id) return;
+    async function loadAll(){
+      setLoading(true);
+      try {
+        // 유저 프로필 (빈 잔액, 인증 여부)
+        const {data:profile} = await supabase
+          .from("profiles").select("*").eq("id",user.id).single();
+        if(profile){
+          setPurchasedBeans(profile.purchased_beans||0);
+          setEarnedBeans(profile.earned_beans||0);
+          setUserVerified(profile.verified||false);
+          setBankAccount(profile.bank_account||"");
+          setViewCount(profile.view_count||0);
+        }
 
-  const [viewCount,setViewCount]=useState(0); // 총 열람 횟수 추적
+        // 커피챗 프로필
+        const {data:chats} = await supabase
+          .from("chat_profiles").select("*").order("created_at",{ascending:false});
+        if(chats) setProfiles(chats.map(p=>({
+          ...p, unlocked:false, initial:p.name?.[0]||"?",
+        })));
 
-  function spendBeans(amount) {
-    let rem=amount;
-    setPurchasedBeans(pb=>{const u=Math.min(pb,rem);rem-=u;return pb-u;});
-    setEarnedBeans(eb=>{const u=Math.min(eb,rem);return eb-u;});
+        // 레주메 리뷰어
+        const {data:revs} = await supabase
+          .from("reviewers").select("*").order("created_at",{ascending:false});
+        if(revs) setReviewers(revs.map(r=>({
+          ...r, tags:r.tags||[], rating:r.rating||5.0, reviews:r.review_count||0,
+        })));
+
+        // Q&A
+        const {data:qs} = await supabase
+          .from("questions").select("*, answers(*)").order("created_at",{ascending:false});
+        if(qs) setQaList(qs.map(q=>({
+          ...q, initial:q.author_id===user.id?"나":"?",
+          author:q.author_id===user.id?"나":"익명",
+          createdAt: new Date(q.created_at).toLocaleDateString("ko-KR"),
+          answers:(q.answers||[]).map(a=>({
+            ...a, initial:"?", author:"익명", verified:false,
+          })),
+        })));
+
+      } catch(e){ console.error(e); }
+      setLoading(false);
+    }
+    loadAll();
+  },[user?.id]);
+
+  // ── 빈 잔액 DB 저장 ──────────────────────────
+  async function spendBeans(amount){
+    try {
+      await supabase.rpc("spend_beans",{user_id:user.id, amount});
+      // 로컬 상태도 업데이트
+      let rem=amount;
+      setPurchasedBeans(pb=>{const u=Math.min(pb,rem);rem-=u;return pb-u;});
+      setEarnedBeans(eb=>{const u=Math.min(eb,rem);return eb-u;});
+    } catch(e){ console.error(e); }
   }
 
+  // ── 핸들러들 ─────────────────────────────────
   function handleUnlock(id){
-    const isFree = viewCount < FREE_VIEWS;
-    if(!isFree && totalBeans < BEANS_PER_VIEW){setBeanModal(true);return;}
+    const isFree=viewCount<FREE_VIEWS;
+    if(!isFree&&totalBeans<BEANS_PER_VIEW){setBeanModal(true);return;}
     setProfiles(ps=>ps.map(p=>p.id===id?{...p,unlocked:true}:p));
-    setViewCount(c=>c+1);
+    const newCount=viewCount+1;
+    setViewCount(newCount);
+    // DB에 view_count 업데이트
+    supabase.from("profiles").update({view_count:newCount}).eq("id",user.id);
     if(!isFree) spendBeans(BEANS_PER_VIEW);
   }
-  function handleSend(){if(totalBeans<BEANS_PER_SEND){setBeanModal(true);return;}spendBeans(BEANS_PER_SEND);}
-  function handleReviewReq(price){spendBeans(price);}
-  function handleBuy(pkg){setPurchasedBeans(pb=>pb+pkg.beans);setBeanModal(false);}
-  function handleWithdraw(amount){setEarnedBeans(eb=>eb-amount);setWithdrawModal(false);}
-  function handleSignupComplete({verified,bank}){if(verified){setUserVerified(true);if(bank)setBankAccount(bank);}}
 
-  function handleAskSubmit({question,industry,bounty}){
-    spendBeans(bounty);
-    setQaList(list=>[{id:Date.now(),author:"나",initial:"나",question,industry,bounty,answers:[],adopted:false,createdAt:"방금 전"},...list]);
+  function handleSend(){
+    if(totalBeans<BEANS_PER_SEND){setBeanModal(true);return;}
+    spendBeans(BEANS_PER_SEND);
   }
-  function handleAdopt(qaId,ansId){
+
+  function handleReviewReq(price){ spendBeans(price); }
+
+  function handleBuy(pkg){
+    setPurchasedBeans(pb=>pb+pkg.beans);
+    setBeanModal(false);
+  }
+
+  function handleWithdraw(amount){
+    setEarnedBeans(eb=>eb-amount);
+    // DB 업데이트
+    supabase.from("profiles")
+      .update({earned_beans:earnedBeans-amount})
+      .eq("id",user.id);
+    setWithdrawModal(false);
+  }
+
+  async function handleAskSubmit({question,industry,bounty}){
+    spendBeans(bounty);
+    const {data} = await supabase.from("questions").insert({
+      author_id:user.id, question, industry, bounty
+    }).select().single();
+    if(data) setQaList(list=>[{
+      ...data, initial:"나", author:"나",
+      createdAt:"방금 전", answers:[], adopted:false,
+    },...list]);
+  }
+
+  async function handleAdopt(qaId,ansId){
+    await supabase.from("questions").update({adopted:true}).eq("id",qaId);
+    await supabase.from("answers").update({adopted:true}).eq("id",ansId);
+    // 채택된 답변자에게 수익빈 지급
+    const ans = qaList.find(q=>q.id===qaId)?.answers.find(a=>a.id===ansId);
+    const qa  = qaList.find(q=>q.id===qaId);
+    if(ans?.author_id && qa?.bounty){
+      await supabase.rpc("add_earned_beans",{user_id:ans.author_id, amount:qa.bounty});
+    }
     setQaList(list=>list.map(q=>{
-      if(q.id!==qaId)return q;
-      const ans=q.answers.find(a=>a.id===ansId);
-      if(!ans)return q;
-      setEarnedBeans(eb=>eb+q.bounty);
+      if(q.id!==qaId) return q;
       return {...q,adopted:true,answers:q.answers.map(a=>({...a,adopted:a.id===ansId}))};
     }));
   }
+
   function handleRefund(qaId){
     setQaList(list=>list.map(q=>{
-      if(q.id!==qaId||q.answers.length>0)return q;
-      setPurchasedBeans(pb=>pb+q.bounty); // 구매빈으로 환불
+      if(q.id!==qaId||q.answers.length>0) return q;
+      setPurchasedBeans(pb=>pb+q.bounty);
+      supabase.from("questions").delete().eq("id",qaId);
       return {...q,refunded:true};
     }));
   }
+
+  function handleSignupComplete({verified,bank}){
+    if(verified){
+      setUserVerified(true);
+      if(bank){
+        setBankAccount(bank);
+        supabase.from("profiles").update({verified:true,bank_account:bank}).eq("id",user.id);
+      }
+    }
+  }
+
   const filtered=filter==="전체"?profiles:profiles.filter(p=>p.industry===filter);
-  const filtQa=filter==="전체"?qaList:qaList.filter(q=>q.industry===filter);
+  const filtQa=(filter==="전체"?qaList:qaList.filter(q=>q.industry===filter)).filter(q=>!q.refunded);
   const sorted=[...filtered];
   const filtRev=filter==="전체"?reviewers:reviewers.filter(r=>r.industry===filter);
 
-  const tabBtn=(id,label)=>({background:"none",border:"none",padding:"12px 20px",fontSize:14,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s"});
+  const tabBtn=(id)=>({background:"none",border:"none",padding:"12px 20px",fontSize:14,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s"});
+
+  if(loading) return (
+    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg}}>
+      <div style={{textAlign:"center"}}>
+        <div style={{fontSize:36,marginBottom:12}}>☕</div>
+        <p style={{color:T.muted,fontSize:14}}>불러오는 중…</p>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{minHeight:"100vh",background:T.bg}}>
