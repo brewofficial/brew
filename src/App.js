@@ -521,9 +521,16 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
       <p style={{fontSize:13,color:T.body,lineHeight:1.6,marginBottom:10}}>{r.description||r.desc}</p>
       <div style={{display:"flex",gap:16,marginBottom:14}}>
         <span style={{fontSize:12,color:T.muted}}>⏱ {r.turnaround}</span>
-        <span style={{fontSize:12,color:"#f5a623",fontWeight:600}}>
-          {"★".repeat(Math.round(r.rating||5))}{"☆".repeat(5-Math.round(r.rating||5))}
-          <span style={{color:T.muted,fontWeight:400,marginLeft:4}}>{(r.rating||5).toFixed(1)} ({r.reviews||r.review_count||0}건)</span>
+        <span style={{display:"flex",alignItems:"center",gap:4}}>
+          <span style={{fontSize:13,letterSpacing:"-1px"}}>
+            {[1,2,3,4,5].map(i=>{
+              const rating = r.rating||5;
+              if(rating >= i) return <span key={i} style={{color:"#f5a623"}}>★</span>;
+              if(rating >= i-0.5) return <span key={i} style={{color:"#f5a623",opacity:0.5}}>★</span>;
+              return <span key={i} style={{color:"#e0d0bc"}}>★</span>;
+            })}
+          </span>
+          <span style={{fontSize:12,color:T.muted}}>{(r.rating||5).toFixed(1)} ({r.reviews||r.review_count||0}건)</span>
         </span>
       </div>
       <div style={{height:1,background:T.border,marginBottom:14}}/>
