@@ -728,7 +728,7 @@ function AskModal({onClose,onSubmit,totalBeans,onBuyBeans}) {
 }
 
 /* ── QA Card ─────────────────────────────────── */
-function QACard({qa,onAdopt,onRefund,index}) {
+function QACard({qa,onAdopt,onRefund,index,currentUserId}) {
   const [open,setOpen]=useState(false);
   const [answer,setAnswer]=useState("");
   const [submitted,setSubmitted]=useState(false);
@@ -799,17 +799,25 @@ function QACard({qa,onAdopt,onRefund,index}) {
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <button onClick={()=>setOpen(true)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px",color:T.muted,fontSize:13,cursor:"pointer",transition:"border-color 0.15s"}}
-                onMouseEnter={e=>e.target.style.borderColor=T.coffee} onMouseLeave={e=>e.target.style.borderColor=T.border}>
-                ✏️ 답변 달기 · 채택 시 <DripIcon size={12} color={T.drip}/> {qa.bounty}빈 수익빈 지급
-              </button>
-              {/* 댓글 없으면 회수 가능, 있으면 불가 안내 */}
-              {qa.answers.length===0?(
+              {/* 본인 질문이면 답변 버튼 숨기기 */}
+              {qa.author_id===currentUserId?(
+                <div style={{textAlign:"center",fontSize:12,color:T.muted,padding:"6px 0"}}>
+                  내가 등록한 질문이에요 · 답변을 기다려주세요
+                </div>
+              ):(
+                <button onClick={()=>setOpen(true)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px",color:T.muted,fontSize:13,cursor:"pointer",transition:"border-color 0.15s"}}
+                  onMouseEnter={e=>e.target.style.borderColor=T.coffee} onMouseLeave={e=>e.target.style.borderColor=T.border}>
+                  ✏️ 답변 달기 · 채택 시 <DripIcon size={12} color={T.drip}/> {qa.bounty}빈 수익빈 지급
+                </button>
+              )}
+              {/* 댓글 없으면 회수 가능 (본인 질문일 때만) */}
+              {qa.author_id===currentUserId&&qa.answers.length===0&&(
                 <button onClick={()=>onRefund(qa.id)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:7,padding:"8px",color:T.muted,fontSize:12,cursor:"pointer",transition:"border-color 0.15s"}}
                   onMouseEnter={e=>e.target.style.borderColor=T.red} onMouseLeave={e=>e.target.style.borderColor=T.border}>
                   ↩ 질문 취소 · {qa.bounty}빈 환불
                 </button>
-              ):(
+              )}
+              {qa.author_id===currentUserId&&qa.answers.length>0&&(
                 <div style={{textAlign:"center",fontSize:11,color:T.muted,padding:"4px 0"}}>
                   💬 댓글이 달려 빈 회수 불가 · 반드시 베스트 답변을 채택해주세요
                 </div>
@@ -1295,7 +1303,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              {filtQa.filter(qa=>!qa.refunded).map((qa,i)=><QACard key={qa.id} qa={qa} onAdopt={handleAdopt} onRefund={handleRefund} index={i}/>)}
+              {filtQa.filter(qa=>!qa.refunded).map((qa,i)=><QACard key={qa.id} qa={qa} onAdopt={handleAdopt} onRefund={handleRefund} index={i} currentUserId={user?.id}/>)}
             </div>
           </>
         )}
