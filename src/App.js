@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
+import { PaymentSuccess, PaymentFail } from "./Payment";
 
 /* ── Tokens ─────────────────────────────────── */
 const T = {
@@ -114,13 +115,34 @@ function Inp({value,onChange,placeholder,type="text",...rest}) {
 
 const Lbl = ({children}) => <label style={{display:"block",fontSize:12,color:T.muted,marginBottom:5,fontWeight:500}}>{children}</label>;
 
-/* ── Bean Modal ─────────────────────────────── */
-function BeanModal({onClose,onBuy}) {
+/* ── Bean Modal (토스페이먼츠 연동) ────────────── */
+function BeanModal({onClose,onBuy,user}) {
+  const [loading,setLoading]=useState(false);
+
+  async function handlePay(pkg) {
+    setLoading(true);
+    try {
+      const tossPayments = await window.TossPayments(process.env.REACT_APP_TOSS_CLIENT_KEY);
+      await tossPayments.requestPayment("카드", {
+        amount: pkg.price,
+        orderId: `brew_${Date.now()}`,
+        orderName: `브루 ${pkg.label} · ${pkg.beans}빈`,
+        customerName: user?.name || "브루 사용자",
+        customerEmail: user?.email || "",
+        successUrl: `${window.location.origin}/payment/success?beans=${pkg.beans}&price=${pkg.price}&label=${pkg.label}`,
+        failUrl: `${window.location.origin}/payment/fail`,
+      });
+    } catch(e) {
+      if(e.code !== "USER_CANCEL") alert("결제 중 오류가 발생했어요. 다시 시도해주세요.");
+    }
+    setLoading(false);
+  }
+
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
       <div style={{background:T.bg,borderRadius:14,padding:"28px 28px 22px",maxWidth:400,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.18)"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontFamily:"'Instrument Serif',serif",fontSize:22,color:T.heading,fontWeight:400,marginBottom:4}}>원두 충전</h2>
-        <p style={{fontSize:13,color:T.muted,marginBottom:20}}>커피챗 열람, 레주메 리뷰 신청에 사용해요.</p>
+        <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.heading,fontWeight:400,marginBottom:4}}>원두 충전</h2>
+        <p style={{fontSize:13,color:T.muted,marginBottom:20}}>커피챗 신청, 레주메 리뷰 신청에 사용해요.</p>
         <div style={{background:T.surface,borderRadius:8,padding:"12px 14px",marginBottom:20,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span>🫘</span>
@@ -135,8 +157,8 @@ function BeanModal({onClose,onBuy}) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
           {BEAN_PKGS.map(pkg=>(
-            <button key={pkg.id} onClick={()=>onBuy(pkg)} style={{background:pkg.popular?T.coffee:T.surface,border:`1px solid ${pkg.popular?T.coffee:T.border}`,borderRadius:9,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",position:"relative",transition:"border-color 0.15s"}}
-              onMouseEnter={e=>{if(!pkg.popular)e.currentTarget.style.borderColor=T.coffee;}}
+            <button key={pkg.id} onClick={()=>handlePay(pkg)} disabled={loading} style={{background:pkg.popular?T.coffee:T.surface,border:`1px solid ${pkg.popular?T.coffee:T.border}`,borderRadius:9,padding:"14px 18px",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:loading?"not-allowed":"pointer",position:"relative",transition:"border-color 0.15s",opacity:loading?0.7:1}}
+              onMouseEnter={e=>{if(!pkg.popular&&!loading)e.currentTarget.style.borderColor=T.coffee;}}
               onMouseLeave={e=>{if(!pkg.popular)e.currentTarget.style.borderColor=T.border;}}>
               {pkg.popular&&<span style={{position:"absolute",top:-9,left:14,background:T.coffeeLt,color:"#fff",fontSize:10,fontWeight:600,padding:"2px 9px",borderRadius:20}}>인기</span>}
               <div>
@@ -895,6 +917,11 @@ function AuthScreen({onLogin}) {
 }
 
 export default function App() {
+  // 결제 성공/실패 페이지 라우팅
+  const path = window.location.pathname;
+  if (path === "/payment/success") return <PaymentSuccess/>;
+  if (path === "/payment/fail")    return <PaymentFail/>;
+
   const [screen,setScreen]=useState(()=>{
     try { return localStorage.getItem("brew_onboarded") ? "auth" : "onboarding"; }
     catch { return "onboarding"; }
@@ -1117,7 +1144,7 @@ function MainApp({user}) {
 
       </main>
 
-      {beanModal    &&<BeanModal onClose={()=>setBeanModal(false)} onBuy={handleBuy}/>}
+      {beanModal    &&<BeanModal onClose={()=>setBeanModal(false)} onBuy={handleBuy} user={user}/>}
       {withdrawModal&&<WithdrawModal earnedBeans={earnedBeans} bankAccount={bankAccount} onClose={()=>setWithdrawModal(false)} onWithdraw={handleWithdraw}/>}
       {signupModal  &&<SignupModal onClose={()=>setSignupModal(false)} onComplete={handleSignupComplete}/>}
       {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);}}/>}
