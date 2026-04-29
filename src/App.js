@@ -492,6 +492,10 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
   const [email,setEmail]=useState("");
   const [note,setNote]=useState("");
   const [sent,setSent]=useState(false);
+  const [rated,setRated]=useState(false);
+  const [myRating,setMyRating]=useState(0);
+  const [hoverRating,setHoverRating]=useState(0);
+  const [review,setReview]=useState("");
   const canAfford=totalBeans>=r.price;
   const canSubmit=canAfford&&file&&email.trim();
   return (
@@ -514,10 +518,13 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>{r.tags.map(t=><Tag key={t} label={t} small/>)}</div>
-      <p style={{fontSize:13,color:T.body,lineHeight:1.6,marginBottom:10}}>{r.desc}</p>
+      <p style={{fontSize:13,color:T.body,lineHeight:1.6,marginBottom:10}}>{r.description||r.desc}</p>
       <div style={{display:"flex",gap:16,marginBottom:14}}>
         <span style={{fontSize:12,color:T.muted}}>⏱ {r.turnaround}</span>
-        <span style={{fontSize:12,color:T.muted}}>★ {r.rating} ({r.reviews}건)</span>
+        <span style={{fontSize:12,color:"#f5a623",fontWeight:600}}>
+          {"★".repeat(Math.round(r.rating||5))}{"☆".repeat(5-Math.round(r.rating||5))}
+          <span style={{color:T.muted,fontWeight:400,marginLeft:4}}>{(r.rating||5).toFixed(1)} ({r.reviews||r.review_count||0}건)</span>
+        </span>
       </div>
       <div style={{height:1,background:T.border,marginBottom:14}}/>
       {!sent?(open?(
@@ -561,7 +568,42 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
           {canAfford?`📄 레주메 리뷰 신청 · ${r.price}빈`:`🫘 빈 충전하기 (${r.price}빈 필요)`}
         </button>
       )):(
-        <div style={{textAlign:"center",padding:"9px",background:T.greenBg,borderRadius:7,fontSize:13,color:T.green,fontWeight:500}}>✅ 신청 완료 — {r.turnaround} 내 <strong>{email}</strong>으로 피드백이 도착해요</div>
+        !rated ? (
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{textAlign:"center",padding:"10px",background:T.greenBg,borderRadius:7,fontSize:13,color:T.green,fontWeight:500}}>
+              ✅ 신청 완료 — {r.turnaround} 내 <strong>{email}</strong>으로 피드백이 도착해요
+            </div>
+            {/* 평점 남기기 */}
+            <div style={{background:T.surface,borderRadius:9,padding:"14px 16px"}}>
+              <p style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>피드백을 받으셨나요? 평점을 남겨주세요</p>
+              {/* 별점 */}
+              <div style={{display:"flex",gap:4,marginBottom:10}}>
+                {[1,2,3,4,5].map(star=>(
+                  <span key={star}
+                    onClick={()=>setMyRating(star)}
+                    onMouseEnter={()=>setHoverRating(star)}
+                    onMouseLeave={()=>setHoverRating(0)}
+                    style={{fontSize:26,cursor:"pointer",color:(hoverRating||myRating)>=star?"#f5a623":"#e0d0bc",transition:"color 0.1s"}}>★</span>
+                ))}
+                {myRating>0&&<span style={{fontSize:12,color:T.muted,marginLeft:4,alignSelf:"center"}}>{["","별로예요","아쉬워요","보통이에요","좋아요","최고예요"][myRating]}</span>}
+              </div>
+              {myRating>0&&(
+                <>
+                  <textarea value={review} onChange={e=>setReview(e.target.value)} placeholder="한 줄 후기를 남겨주세요 (선택)" rows={2}
+                    style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"8px 10px",fontSize:12,resize:"none",outline:"none",color:T.heading,lineHeight:1.5,boxSizing:"border-box"}}
+                    onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+                  <button onClick={()=>setRated(true)} style={{width:"100%",marginTop:8,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                    평점 등록
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        ):(
+          <div style={{textAlign:"center",padding:"10px",background:T.tag,borderRadius:7,fontSize:13,color:T.tagText}}>
+            {"★".repeat(myRating)}{"☆".repeat(5-myRating)} 평점이 등록됐어요. 감사해요!
+          </div>
+        )
       )}
     </div>
   );
