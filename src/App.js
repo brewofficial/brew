@@ -943,10 +943,10 @@ function AuthScreen({onLogin}) {
           <span style={{fontSize:12,color:T.muted}}>또는</span>
           <div style={{flex:1,height:1,background:T.border}}/>
         </div>
-        {/* Kakao */}
-        <button onClick={()=>onLogin({name:"카카오 사용자",email:"kakao@brew.com",kakao:true})} style={{width:"100%",background:"#FEE500",border:"none",borderRadius:10,padding:"13px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"pointer",fontSize:14,fontWeight:600,color:"#191919"}}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#191919"><path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.7 1.58 5.08 4 6.58L5 21l4.28-2.42C10.14 18.84 11.05 19 12 19c5.52 0 10-3.48 10-7.8S17.52 3 12 3z"/></svg>
-          카카오로 시작하기
+        {/* Kakao - 준비 중 */}
+        <button disabled style={{width:"100%",background:"#f5f5f5",border:"1px solid #e0e0e0",borderRadius:10,padding:"13px",display:"flex",alignItems:"center",justifyContent:"center",gap:10,cursor:"not-allowed",fontSize:14,fontWeight:600,color:"#aaa"}}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="#aaa"><path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.7 1.58 5.08 4 6.58L5 21l4.28-2.42C10.14 18.84 11.05 19 12 19c5.52 0 10-3.48 10-7.8S17.52 3 12 3z"/></svg>
+          카카오 로그인 (준비 중)
         </button>
         {mode==="login"&&(
           <p style={{textAlign:"center",fontSize:12,color:T.muted,marginTop:14,cursor:"pointer"}} onClick={()=>setMode("signup")}>
