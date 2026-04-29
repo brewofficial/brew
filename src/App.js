@@ -564,7 +564,7 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
             <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="hong@email.com"
               style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px",fontSize:13,outline:"none",color:T.heading,boxSizing:"border-box"}}
               onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
-            <p style={{fontSize:11,color:T.muted,marginTop:4}}>리뷰어가 이 주소로 피드백을 보내드려요.</p>
+            <p style={{fontSize:11,color:T.red,marginTop:4}}>⚠️ 이메일을 잘못 기입하면 빈이 환불되지 않으니 다시 한번 확인해주세요.</p>
           </div>
           <div style={{display:"flex",gap:7}}>
             <button onClick={()=>{onRequest(r.price);setSent(true);}} disabled={!canSubmit} style={{flex:1,background:canSubmit?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:canSubmit?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:canSubmit?"pointer":"not-allowed"}}>신청 · {r.price}빈 사용</button>
