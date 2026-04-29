@@ -525,8 +525,10 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
           <span style={{fontSize:13,letterSpacing:"-1px"}}>
             {[1,2,3,4,5].map(i=>{
               const rating = r.rating||5;
-              if(rating >= i) return <span key={i} style={{color:"#f5a623"}}>★</span>;
-              if(rating >= i-0.5) return <span key={i} style={{color:"#f5a623",opacity:0.5}}>★</span>;
+              const full = Math.floor(rating);
+              const hasHalf = rating !== full; // 소수점 있으면 반별
+              if(i <= full) return <span key={i} style={{color:"#f5a623"}}>★</span>;
+              if(i === full+1 && hasHalf) return <span key={i} style={{color:"#f5a623",opacity:0.5}}>★</span>;
               return <span key={i} style={{color:"#e0d0bc"}}>★</span>;
             })}
           </span>
