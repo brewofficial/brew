@@ -758,30 +758,54 @@ function QACard({qa,onAdopt,onRefund,index,currentUserId}) {
         </div>
       </div>
 
-      {/* Answers */}
+      {/* Answers — 질문자는 전체, 답변자는 본인 것만 */}
       {qa.answers.length>0&&(
-        <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:12,display:"flex",flexDirection:"column",gap:10}}>
-          {qa.answers.map((ans,i)=>(
-            <div key={ans.id} style={{background:ans.adopted?T.greenBg:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${ans.adopted?T.green:T.border}`}}>
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
-                <div style={{display:"flex",alignItems:"center",gap:6}}>
-                  <div style={{width:24,height:24,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600,fontFamily:"'Instrument Serif',serif"}}>{ans.initial}</div>
-                  <span style={{fontSize:13,fontWeight:600,color:T.heading}}>{ans.author}</span>
-                  {ans.verified&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"1px 6px",borderRadius:20,fontWeight:600}}>✓ 인증</span>}
-                  {ans.adopted&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"1px 6px",borderRadius:20,fontWeight:700}}>⭐ 채택</span>}
+        qa.author_id===currentUserId ? (
+          <div style={{borderTop:`1px solid ${T.border}`,paddingTop:12,marginBottom:12,display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{fontSize:11,color:T.muted,marginBottom:4}}>💬 답변 {qa.answers.length}개 — 질문자에게만 보여요</div>
+            {qa.answers.map((ans)=>(
+              <div key={ans.id} style={{background:ans.adopted?T.greenBg:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${ans.adopted?T.green:T.border}`}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{width:24,height:24,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:600}}>{ans.initial}</div>
+                    <span style={{fontSize:13,fontWeight:600,color:T.heading}}>{ans.author}</span>
+                    {ans.verified&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"1px 6px",borderRadius:20,fontWeight:600}}>✓ 인증</span>}
+                    {ans.adopted&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"1px 6px",borderRadius:20,fontWeight:700}}>⭐ 채택</span>}
+                  </div>
+                  {!qa.adopted&&(
+                    <button onClick={()=>onAdopt(qa.id,ans.id)} style={{background:"none",border:`1px solid ${T.coffee}`,borderRadius:20,padding:"4px 12px",fontSize:11,color:T.coffee,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}
+                      onMouseEnter={e=>{e.target.style.background=T.coffee;e.target.style.color="#fff";}}
+                      onMouseLeave={e=>{e.target.style.background="none";e.target.style.color=T.coffee;}}>
+                      채택하기
+                    </button>
+                  )}
                 </div>
-                {!qa.adopted&&(
-                  <button onClick={()=>onAdopt(qa.id,ans.id)} style={{background:"none",border:`1px solid ${T.coffee}`,borderRadius:20,padding:"4px 12px",fontSize:11,color:T.coffee,fontWeight:600,cursor:"pointer",transition:"all 0.15s"}}
-                    onMouseEnter={e=>{e.target.style.background=T.coffee;e.target.style.color="#fff";}}
-                    onMouseLeave={e=>{e.target.style.background="none";e.target.style.color=T.coffee;}}>
-                    채택하기
-                  </button>
-                )}
+                <p style={{fontSize:13,color:T.body,lineHeight:1.65}}>{ans.text}</p>
               </div>
-              <p style={{fontSize:13,color:T.body,lineHeight:1.65}}>{ans.text}</p>
+            ))}
+          </div>
+        ):(()=>{
+          // 내가 쓴 답변만 찾기
+          const myAns = qa.answers.find(a=>a.author_id===currentUserId);
+          return (
+            <div style={{borderTop:`1px solid ${T.border}`,paddingTop:10,marginBottom:12,display:"flex",flexDirection:"column",gap:8}}>
+              {myAns ? (
+                <>
+                  <div style={{fontSize:11,color:T.muted}}>✏️ 내 답변 — 다른 답변은 볼 수 없어요</div>
+                  <div style={{background:myAns.adopted?T.greenBg:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${myAns.adopted?T.green:T.border}`}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                      {myAns.adopted&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"1px 6px",borderRadius:20,fontWeight:700}}>⭐ 채택됨</span>}
+                      {!myAns.adopted&&<span style={{fontSize:11,color:T.muted}}>채택 대기 중</span>}
+                    </div>
+                    <p style={{fontSize:13,color:T.body,lineHeight:1.65}}>{myAns.text}</p>
+                  </div>
+                </>
+              ):(
+                <span style={{fontSize:12,color:T.muted}}>💬 답변 {qa.answers.length}개 달림 · 질문자만 확인 가능해요</span>
+              )}
             </div>
-          ))}
-        </div>
+          );
+        })()
       )}
 
       {/* Answer input */}
@@ -977,7 +1001,7 @@ function AuthScreen({onLogin}) {
 
 /* ── My Page ─────────────────────────────────── */
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
-  const [tab,setTab]=useState("beans"); // beans | coffee | resume
+  const [tab,setTab]=useState("beans"); // beans | coffee | resume | answers
   const [chatHistory]=useState([
     {id:1,name:"김지수",role:"Product Manager",company:"카카오",date:"2025.04.20",status:"답변대기"},
     {id:2,name:"오재원",role:"Data Scientist",company:"네이버",date:"2025.04.18",status:"완료"},
@@ -985,6 +1009,10 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
   const [resumeHistory]=useState([
     {id:1,role:"Product Manager",company:"카카오",date:"2025.04.19",status:"피드백 완료",rating:5},
     {id:2,role:"Senior Engineer",company:"토스",date:"2025.04.15",status:"검토 중",rating:null},
+  ]);
+  const [answerHistory]=useState([
+    {id:1,question:"카카오 PM 최종면접 준비할 때 가장 중요한 게 뭔가요?",bounty:3,status:"채택 대기",adopted:false,date:"2025.04.21"},
+    {id:2,question:"토스 개발자로 이직할 때 코딩테스트 난이도가 어떤가요?",bounty:5,status:"채택됨",adopted:true,date:"2025.04.19"},
   ]);
 
   const tabStyle=(id)=>({
@@ -1032,9 +1060,10 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
 
         {/* Tabs */}
         <div style={{display:"flex",borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
-          <button style={tabStyle("beans")} onClick={()=>setTab("beans")}>빈 현황</button>
-          <button style={tabStyle("coffee")} onClick={()=>setTab("coffee")}>☕ 커피챗</button>
-          <button style={tabStyle("resume")} onClick={()=>setTab("resume")}>📄 레주메</button>
+          <button style={tabStyle("beans")} onClick={()=>setTab("beans")}>빈</button>
+          <button style={tabStyle("coffee")} onClick={()=>setTab("coffee")}>☕</button>
+          <button style={tabStyle("resume")} onClick={()=>setTab("resume")}>📄</button>
+          <button style={tabStyle("answers")} onClick={()=>setTab("answers")}>✏️</button>
         </div>
 
         {/* Content */}
@@ -1121,6 +1150,30 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                   </div>
                   {r.rating&&<div style={{fontSize:12,color:"#f5a623",marginTop:6}}>{"★".repeat(r.rating)}{"☆".repeat(5-r.rating)}</div>}
                   <div style={{fontSize:11,color:T.muted,marginTop:6}}>{r.date}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 내 답변 내역 */}
+          {tab==="answers"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:12,color:T.muted,marginBottom:4}}>총 {answerHistory.length}건 · 채택 시 수익빈 지급</div>
+              {answerHistory.map(a=>(
+                <div key={a.id} style={{background:T.surface,borderRadius:10,padding:"14px 16px",border:`1px solid ${a.adopted?T.green:T.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                    <p style={{fontSize:13,color:T.heading,lineHeight:1.5,flex:1}}>{a.question}</p>
+                    <span style={{fontSize:11,padding:"3px 9px",borderRadius:20,fontWeight:600,whiteSpace:"nowrap",flexShrink:0,background:a.adopted?T.greenBg:T.tag,color:a.adopted?T.green:T.tagText}}>
+                      {a.adopted?"⭐ 채택됨":"대기 중"}
+                    </span>
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:8}}>
+                    <span style={{fontSize:11,color:T.muted}}>{a.date}</span>
+                    {a.adopted
+                      ?<span style={{fontSize:11,color:T.drip,fontWeight:600,display:"flex",alignItems:"center",gap:3}}><DripIcon size={11}/> {a.bounty}빈 수익빈 지급</span>
+                      :<span style={{fontSize:11,color:T.muted}}>채택 시 🫘 {a.bounty}빈</span>
+                    }
+                  </div>
                 </div>
               ))}
             </div>
