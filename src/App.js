@@ -1051,11 +1051,14 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
               <div style={{fontSize:18,fontWeight:700,color:"#fff",display:"flex",alignItems:"center",gap:4}}><DripIcon size={16} color="#fff"/> {earnedBeans}</div>
             </div>
           </div>
-          {/* 빠른 버튼 */}
-          <div style={{display:"flex",gap:8,marginTop:10}}>
-            <button onClick={()=>{onClose();onCharge();}} style={{flex:1,background:"#fff",border:"none",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:T.coffee,cursor:"pointer"}}>🫘 빈 충전</button>
-            {earnedBeans>0&&<button onClick={()=>{onClose();onWithdraw();}} style={{flex:1,background:"rgba(255,255,255,0.2)",border:"1px solid rgba(255,255,255,0.3)",borderRadius:8,padding:"8px",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer"}}><DripIcon size={12} color="#fff"/> 현금 전환</button>}
-          </div>
+          {/* 빠른 버튼 — 수익빈 있을 때만 현금 전환 */}
+          {earnedBeans>0&&(
+            <div style={{marginTop:10}}>
+              <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,color:T.coffee,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                <DripIcon size={14}/> 현금으로 전환하기
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -1105,14 +1108,15 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
               </div>
               {earnedBeans>0&&(
                 <div style={{background:T.dripBg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.coffeeLt}`}}>
-                  <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4}}>
+                  <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
                     <DripIcon size={13}/> 수익빈 {earnedBeans}빈 = ₩{(earnedBeans*2000).toLocaleString()}
                   </div>
                   <div style={{fontSize:12,color:T.muted,marginBottom:10}}>연동 계좌: {bankAccount||"미등록"}</div>
-                  <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>현금으로 전환하기</button>
+                  <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                    <DripIcon size={13} color="#fff"/> 현금으로 전환하기
+                  </button>
                 </div>
               )}
-              <button onClick={()=>{onClose();onCharge();}} style={{width:"100%",background:"none",border:`1px solid ${T.coffee}`,borderRadius:7,padding:"10px",color:T.coffee,fontWeight:600,fontSize:13,cursor:"pointer"}}>🫘 빈 충전하기</button>
             </div>
           )}
 
@@ -1555,14 +1559,12 @@ function MainApp({user}) {
 
           {/* Right controls */}
           <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
-            {/* Bean wallet — compact */}
+            {/* Bean wallet — 클릭하면 충전 */}
             <div style={{display:"flex",alignItems:"center",gap:5,background:T.surface,border:`1px solid ${T.border}`,borderRadius:20,padding:"4px 10px",fontSize:12,cursor:"pointer",whiteSpace:"nowrap"}} onClick={()=>setBeanModal(true)}>
               <span>🫘 {purchasedBeans}</span>
               <span style={{color:T.border}}>·</span>
               <span style={{display:"inline-flex",alignItems:"center",gap:2,color:T.drip,fontWeight:600}}><DripIcon size={12}/> {earnedBeans}</span>
             </div>
-            <button onClick={()=>setBeanModal(true)} style={{background:T.coffee,border:"none",borderRadius:20,padding:"5px 12px",fontSize:12,color:"#fff",fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>충전</button>
-            {earnedBeans>0&&<button onClick={()=>setWithdrawModal(true)} style={{background:T.dripBg,border:`1px solid ${T.coffeeLt}`,borderRadius:20,padding:"5px 12px",fontSize:12,color:T.drip,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>출금</button>}
             {/* User avatar - 클릭하면 마이페이지 */}
             <div onClick={()=>setMyPageModal(true)} style={{width:28,height:28,borderRadius:"50%",background:T.coffee,color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,fontFamily:"'Noto Serif KR',serif",flexShrink:0,marginLeft:2,cursor:"pointer"}}>
               {user?.kakao ? user.email.split("@")[0][0].toUpperCase() : user?.name?.[0]||"U"}
