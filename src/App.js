@@ -908,20 +908,27 @@ function AuthScreen({onLogin}) {
     if(mode==="signup"&&pw!==pwConfirm){setError("비밀번호가 일치하지 않아요.");return;}
     setError("");setLoading(true);
     try {
+      // 10초 타임아웃
+      const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),10000));
       if(mode==="signup"){
-        const {error:err} = await supabase.auth.signUp({
-          email, password:pw,
-          options:{data:{name:name||email.split("@")[0]}}
-        });
+        const {error:err} = await Promise.race([
+          supabase.auth.signUp({email,password:pw,options:{data:{name:name||email.split("@")[0]}}}),
+          timeout
+        ]);
         if(err) throw err;
-        setVerified(true); // 인증 메일 발송
+        setVerified(true);
       } else {
-        const {data,error:err} = await supabase.auth.signInWithPassword({email,password:pw});
+        const {data,error:err} = await Promise.race([
+          supabase.auth.signInWithPassword({email,password:pw}),
+          timeout
+        ]);
         if(err) throw err;
-        onLogin({name:data.user.user_metadata?.name||email.split("@")[0],email});
+        onLogin({name:data.user.user_metadata?.name||email.split("@")[0],email,id:data.user.id});
       }
     } catch(e){
-      setError(e.message==="Invalid login credentials"?"이메일 또는 비밀번호가 틀렸어요.":e.message);
+      if(e.message==="timeout") setError("연결 시간이 초과됐어요. 다시 시도해주세요.");
+      else if(e.message==="Invalid login credentials") setError("이메일 또는 비밀번호가 틀렸어요.");
+      else setError(e.message);
     }
     setLoading(false);
   }
@@ -1103,15 +1110,6 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                     <div style={{fontSize:18,fontWeight:700,color:T.heading}}>{purchasedBeans+earnedBeans}빈</div>
                   </div>
                 </div>
-              </div>
-              <div style={{background:T.dripBg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.coffeeLt}`}}>
-                <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
-                  <DripIcon size={13}/> 수익빈 {earnedBeans}빈 = ₩{(earnedBeans*2000).toLocaleString()}
-                </div>
-                <div style={{fontSize:12,color:T.muted,marginBottom:10}}>연동 계좌: {bankAccount||"미등록"}</div>
-                <button onClick={()=>{onClose();onWithdraw();}} disabled={earnedBeans===0} style={{width:"100%",background:earnedBeans>0?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:earnedBeans>0?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:earnedBeans>0?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                  <DripIcon size={13} color={earnedBeans>0?"#fff":T.muted}/> {earnedBeans>0?"현금으로 전환하기":"수익빈이 없어요"}
-                </button>
               </div>
             </div>
           )}
