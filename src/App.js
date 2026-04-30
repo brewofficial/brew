@@ -1051,14 +1051,12 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
               <div style={{fontSize:18,fontWeight:700,color:"#fff",display:"flex",alignItems:"center",gap:4}}><DripIcon size={16} color="#fff"/> {earnedBeans}</div>
             </div>
           </div>
-          {/* 빠른 버튼 — 수익빈 있을 때만 현금 전환 */}
-          {earnedBeans>0&&(
-            <div style={{marginTop:10}}>
-              <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,color:T.coffee,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                <DripIcon size={14}/> 현금으로 전환하기
-              </button>
-            </div>
-          )}
+          {/* 현금 전환 버튼 — 항상 표시 */}
+          <div style={{marginTop:10}}>
+            <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:"#fff",border:"none",borderRadius:8,padding:"9px",fontSize:13,fontWeight:600,color:T.coffee,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+              <DripIcon size={14}/> 현금으로 전환하기
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -1106,17 +1104,15 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                   </div>
                 </div>
               </div>
-              {earnedBeans>0&&(
-                <div style={{background:T.dripBg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.coffeeLt}`}}>
-                  <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
-                    <DripIcon size={13}/> 수익빈 {earnedBeans}빈 = ₩{(earnedBeans*2000).toLocaleString()}
-                  </div>
-                  <div style={{fontSize:12,color:T.muted,marginBottom:10}}>연동 계좌: {bankAccount||"미등록"}</div>
-                  <button onClick={()=>{onClose();onWithdraw();}} style={{width:"100%",background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
-                    <DripIcon size={13} color="#fff"/> 현금으로 전환하기
-                  </button>
+              <div style={{background:T.dripBg,borderRadius:10,padding:"14px 16px",border:`1px solid ${T.coffeeLt}`}}>
+                <div style={{fontSize:13,color:T.drip,fontWeight:600,marginBottom:4,display:"flex",alignItems:"center",gap:4}}>
+                  <DripIcon size={13}/> 수익빈 {earnedBeans}빈 = ₩{(earnedBeans*2000).toLocaleString()}
                 </div>
-              )}
+                <div style={{fontSize:12,color:T.muted,marginBottom:10}}>연동 계좌: {bankAccount||"미등록"}</div>
+                <button onClick={()=>{onClose();onWithdraw();}} disabled={earnedBeans===0} style={{width:"100%",background:earnedBeans>0?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:earnedBeans>0?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:earnedBeans>0?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:6}}>
+                  <DripIcon size={13} color={earnedBeans>0?"#fff":T.muted}/> {earnedBeans>0?"현금으로 전환하기":"수익빈이 없어요"}
+                </button>
+              </div>
             </div>
           )}
 
