@@ -1390,6 +1390,9 @@ function MainApp({user}) {
     if(!user?.id) return;
     async function loadAll(){
       setLoading(true);
+  useEffect(()=>{
+    async function loadAll(){
+      setLoading(true);
       try {
         // 유저 프로필 (빈 잔액, 인증 여부)
         const {data:profile} = await supabase
@@ -1429,10 +1432,18 @@ function MainApp({user}) {
           })),
         })));
 
-      } catch(e){ console.error(e); }
-      setLoading(false);
+      } catch(e){
+        console.error("loadAll error:", e);
+      } finally {
+        setLoading(false); // 에러나도 반드시 로딩 해제
+      }
     }
-    loadAll();
+
+    if(user?.id){
+      loadAll();
+    } else {
+      setLoading(false); // user.id 없으면 즉시 로딩 해제
+    }
   },[user?.id]);
 
   // ── 빈 잔액 DB 저장 ──────────────────────────
