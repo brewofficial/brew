@@ -1119,10 +1119,6 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                     <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
                   </div>
                   <div style={{height:1,background:T.border}}/>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <div style={{fontSize:13,fontWeight:600,color:T.heading}}>합계</div>
-                    <div style={{fontSize:18,fontWeight:700,color:T.heading}}>{purchasedBeans+earnedBeans}빈</div>
-                  </div>
                 </div>
               </div>
             </div>
