@@ -1400,10 +1400,6 @@ function MainApp({user}) {
 
   // ── Supabase 데이터 로드 ──────────────────────
   useEffect(()=>{
-    if(!user?.id) return;
-    async function loadAll(){
-      setLoading(true);
-  useEffect(()=>{
     async function loadAll(){
       setLoading(true);
       try {
