@@ -419,7 +419,7 @@ function SignupModal({onClose,onComplete}) {
 
 
 /* ── Profile Card ───────────────────────────── */
-function ProfileCard({p,onUnlock,onSend,totalBeans,viewCount,index}) {
+function ProfileCard({p,onUnlock,onSend,purchasedBeans,viewCount,index}) {
   const [open,setOpen]=useState(false);
   const [msg,setMsg]=useState("");
   const [sent,setSent]=useState(false);
@@ -475,9 +475,9 @@ function ProfileCard({p,onUnlock,onSend,totalBeans,viewCount,index}) {
             : <span style={{fontSize:12,color:T.muted}}>열람 · 1빈 소요</span>
           }
           <button onClick={()=>onUnlock(p.id)}
-            disabled={viewCount >= FREE_VIEWS && totalBeans < BEANS_PER_VIEW}
-            style={{background:viewCount<FREE_VIEWS?T.coffee:(totalBeans>=BEANS_PER_VIEW?T.coffee:T.tag),border:"none",borderRadius:7,padding:"8px 16px",color:viewCount<FREE_VIEWS?"#fff":(totalBeans>=BEANS_PER_VIEW?"#fff":T.muted),fontSize:12,fontWeight:600,cursor:(viewCount>=FREE_VIEWS&&totalBeans<BEANS_PER_VIEW)?"not-allowed":"pointer"}}>
-            {viewCount < FREE_VIEWS ? "무료 열람" : totalBeans >= BEANS_PER_VIEW ? "열람 · 1빈" : "빈 부족"}
+            disabled={viewCount >= FREE_VIEWS && purchasedBeans < BEANS_PER_VIEW}
+            style={{background:viewCount<FREE_VIEWS?T.coffee:(purchasedBeans>=BEANS_PER_VIEW?T.coffee:T.tag),border:"none",borderRadius:7,padding:"8px 16px",color:viewCount<FREE_VIEWS?"#fff":(purchasedBeans>=BEANS_PER_VIEW?"#fff":T.muted),fontSize:12,fontWeight:600,cursor:(viewCount>=FREE_VIEWS&&purchasedBeans<BEANS_PER_VIEW)?"not-allowed":"pointer"}}>
+            {viewCount < FREE_VIEWS ? "무료 열람" : purchasedBeans >= BEANS_PER_VIEW ? "열람 · 1빈" : "빈 부족"}
           </button>
         </div>
       )}
@@ -486,7 +486,7 @@ function ProfileCard({p,onUnlock,onSend,totalBeans,viewCount,index}) {
 }
 
 /* ── Reviewer Card ──────────────────────────── */
-function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
+function ReviewerCard({r,onRequest,onBuyBeans,purchasedBeans,index,userVerified}) {
   const [open,setOpen]=useState(false);
   const [file,setFile]=useState(null);
   const [email,setEmail]=useState("");
@@ -496,7 +496,7 @@ function ReviewerCard({r,onRequest,onBuyBeans,totalBeans,index,userVerified}) {
   const [myRating,setMyRating]=useState(0);
   const [hoverRating,setHoverRating]=useState(0);
   const [review,setReview]=useState("");
-  const canAfford=totalBeans>=r.price;
+  const canAfford=purchasedBeans>=r.price;
   const canSubmit=canAfford&&file&&email.trim();
   return (
     <div className="fade" style={{animationDelay:`${index*0.04}s`,opacity:0,background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:"20px",transition:"box-shadow 0.15s"}}
@@ -669,12 +669,12 @@ function RegisterReviewerModal({onClose,onRegister,userVerified,onGoVerify}) {
 
 
 /* ── Ask Modal (질문 등록) ───────────────────── */
-function AskModal({onClose,onSubmit,totalBeans,onBuyBeans}) {
+function AskModal({onClose,onSubmit,purchasedBeans,onBuyBeans}) {
   const [q,setQ]=useState("");
   const [bounty,setBounty]=useState("");
   const [industry,setIndustry]=useState("IT/테크");
   const presets=[1,2,3,5,10];
-  const canSubmit=q.trim()&&parseInt(bounty)>0&&parseInt(bounty)<=totalBeans;
+  const canSubmit=q.trim()&&parseInt(bounty)>0&&parseInt(bounty)<=purchasedBeans;
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
@@ -707,7 +707,7 @@ function AskModal({onClose,onSubmit,totalBeans,onBuyBeans}) {
               ))}
             </div>
             <Inp type="number" value={bounty} onChange={e=>setBounty(e.target.value)} placeholder="직접 입력"/>
-            {parseInt(bounty)>totalBeans&&<p style={{fontSize:11,color:T.red,marginTop:4}}>보유 빈이 부족해요</p>}
+            {parseInt(bounty)>purchasedBeans&&<p style={{fontSize:11,color:T.red,marginTop:4}}>보유 빈이 부족해요</p>}
           </div>
           {/* Notice */}
           <div style={{background:T.surface,borderRadius:8,padding:"10px 14px",fontSize:12,color:T.muted,lineHeight:1.6}}>
@@ -715,10 +715,10 @@ function AskModal({onClose,onSubmit,totalBeans,onBuyBeans}) {
             댓글이 없으면 예치 빈 전액 회수 가능
           </div>
           <button onClick={()=>{
-            if(!canSubmit){if(parseInt(bounty)>totalBeans)onBuyBeans();return;}
+            if(!canSubmit){if(parseInt(bounty)>purchasedBeans)onBuyBeans();return;}
             onSubmit({question:q,industry,bounty:parseInt(bounty)});onClose();
           }} style={{background:canSubmit?T.coffee:T.tag,border:"none",borderRadius:7,padding:"11px",color:canSubmit?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:canSubmit?"pointer":"not-allowed"}}>
-            {parseInt(bounty)>totalBeans?"🫘 빈 충전하기":"질문 등록 · "+bounty+"빈 예치"}
+            {parseInt(bounty)>purchasedBeans?"🫘 빈 충전하기":"질문 등록 · "+bounty+"빈 예치"}
           </button>
         </div>
         <button onClick={onClose} style={{width:"100%",marginTop:8,background:"none",border:"none",padding:"8px",color:T.muted,fontSize:13,cursor:"pointer"}}>닫기</button>
@@ -817,7 +817,7 @@ function QACard({qa,onAdopt,onRefund,index,currentUserId}) {
                 style={{border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px",fontSize:13,resize:"none",outline:"none",color:T.heading,lineHeight:1.6}}
                 onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
               <div style={{display:"flex",gap:7}}>
-                <button onClick={()=>setSubmitted(true)} disabled={!answer.trim()} style={{flex:1,background:answer.trim()?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:answer.trim()?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:answer.trim()?"pointer":"not-allowed"}}>답변 등록</button>
+                <button onClick={()=>{setSubmitted(true);sendNotification("✏️ 답변 등록 완료","채택되면 수익빈이 지급돼요!");}} disabled={!answer.trim()} style={{flex:1,background:answer.trim()?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:answer.trim()?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:answer.trim()?"pointer":"not-allowed"}}>답변 등록</button>
                 <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
               </div>
             </div>
@@ -1004,6 +1004,20 @@ function AuthScreen({onLogin}) {
       </div>
     </div>
   );
+}
+
+// ── 브라우저 알림 ────────────────────────────────
+async function requestNotificationPermission() {
+  if(!("Notification" in window)) return false;
+  if(Notification.permission==="granted") return true;
+  const permission = await Notification.requestPermission();
+  return permission==="granted";
+}
+
+function sendNotification(title, body) {
+  if(Notification.permission==="granted"){
+    new Notification(title, {body, icon:"/favicon.ico"});
+  }
 }
 
 /* ── My Page ─────────────────────────────────── */
@@ -1370,7 +1384,7 @@ function MainApp({user}) {
 
   const [purchasedBeans,setPurchasedBeans]=useState(0);
   const [earnedBeans,setEarnedBeans]=useState(0);
-  const totalBeans=purchasedBeans+earnedBeans;
+  const purchasedBeans=purchasedBeans+earnedBeans;
 
   const [userVerified,setUserVerified]=useState(false);
   const [bankAccount,setBankAccount]=useState("");
@@ -1441,26 +1455,38 @@ function MainApp({user}) {
 
     if(user?.id){
       loadAll();
+      requestNotificationPermission(); // 로그인 시 알림 권한 요청
     } else {
-      setLoading(false); // user.id 없으면 즉시 로딩 해제
+      setLoading(false);
     }
   },[user?.id]);
 
-  // ── 빈 잔액 DB 저장 ──────────────────────────
+  // ── 빈 차감 — 구매빈만 사용, 부족하면 충전 모달 ──
   async function spendBeans(amount){
+    if(purchasedBeans < amount){
+      setBeanModal(true);
+      return false; // 실패
+    }
     try {
-      await supabase.rpc("spend_beans",{user_id:user.id, amount});
-      // 로컬 상태도 업데이트
-      let rem=amount;
-      setPurchasedBeans(pb=>{const u=Math.min(pb,rem);rem-=u;return pb-u;});
-      setEarnedBeans(eb=>{const u=Math.min(eb,rem);return eb-u;});
-    } catch(e){ console.error(e); }
+      await supabase.from("profiles")
+        .update({purchased_beans: purchasedBeans - amount})
+        .eq("id", user.id);
+      await supabase.from("bean_transactions").insert({
+        user_id: user.id, type:"spend", amount,
+        description:`서비스 이용 (${amount}빈)`,
+      });
+      setPurchasedBeans(pb => pb - amount);
+      return true; // 성공
+    } catch(e){
+      console.error(e);
+      return false;
+    }
   }
 
   // ── 핸들러들 ─────────────────────────────────
   function handleUnlock(id){
     const isFree=viewCount<FREE_VIEWS;
-    if(!isFree&&totalBeans<BEANS_PER_VIEW){setBeanModal(true);return;}
+    if(!isFree&&purchasedBeans<BEANS_PER_VIEW){setBeanModal(true);return;}
     setProfiles(ps=>ps.map(p=>p.id===id?{...p,unlocked:true}:p));
     const newCount=viewCount+1;
     setViewCount(newCount);
@@ -1469,13 +1495,16 @@ function MainApp({user}) {
     if(!isFree) spendBeans(BEANS_PER_VIEW);
   }
 
-  function handleSend(){
-    if(totalBeans<BEANS_PER_SEND){setBeanModal(true);return false;}
-    spendBeans(BEANS_PER_SEND);
-    return true;
+  async function handleSend(){
+    if(purchasedBeans<BEANS_PER_SEND){setBeanModal(true);return false;}
+    const ok = await spendBeans(BEANS_PER_SEND);
+    return ok;
   }
 
-  function handleReviewReq(price){ spendBeans(price); }
+  async function handleReviewReq(price){
+    if(purchasedBeans<price){setBeanModal(true);return false;}
+    return await spendBeans(price);
+  }
 
   function handleBuy(pkg){
     setPurchasedBeans(pb=>pb+pkg.beans);
@@ -1484,7 +1513,6 @@ function MainApp({user}) {
 
   function handleWithdraw(amount){
     setEarnedBeans(eb=>eb-amount);
-    // DB 업데이트
     supabase.from("profiles")
       .update({earned_beans:earnedBeans-amount})
       .eq("id",user.id);
@@ -1492,7 +1520,9 @@ function MainApp({user}) {
   }
 
   async function handleAskSubmit({question,industry,bounty}){
-    spendBeans(bounty);
+    if(purchasedBeans<bounty){setBeanModal(true);return;}
+    const ok = await spendBeans(bounty);
+    if(!ok) return;
     const {data} = await supabase.from("questions").insert({
       author_id:user.id, question, industry, bounty
     }).select().single();
@@ -1505,7 +1535,6 @@ function MainApp({user}) {
   async function handleAdopt(qaId,ansId){
     await supabase.from("questions").update({adopted:true}).eq("id",qaId);
     await supabase.from("answers").update({adopted:true}).eq("id",ansId);
-    // 채택된 답변자에게 수익빈 지급
     const ans = qaList.find(q=>q.id===qaId)?.answers.find(a=>a.id===ansId);
     const qa  = qaList.find(q=>q.id===qaId);
     if(ans?.author_id && qa?.bounty){
@@ -1515,6 +1544,7 @@ function MainApp({user}) {
       if(q.id!==qaId) return q;
       return {...q,adopted:true,answers:q.answers.map(a=>({...a,adopted:a.id===ansId}))};
     }));
+    sendNotification("⭐ 베스트 답변 채택", `${qa?.bounty}빈이 수익빈으로 지급됐어요!`);
   }
 
   function handleRefund(qaId){
@@ -1605,7 +1635,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onUnlock={handleUnlock} onSend={handleSend} totalBeans={totalBeans} viewCount={viewCount} index={i}/>)}
+              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onUnlock={handleUnlock} onSend={handleSend} purchasedBeans={purchasedBeans} viewCount={viewCount} index={i}/>)}
             </div>
           </>
         )}
@@ -1632,7 +1662,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {filtRev.map((r,i)=><ReviewerCard key={r.id} r={r} onRequest={handleReviewReq} onBuyBeans={()=>setBeanModal(true)} totalBeans={totalBeans} index={i} userVerified={userVerified}/>)}
+              {filtRev.map((r,i)=><ReviewerCard key={r.id} r={r} onRequest={handleReviewReq} onBuyBeans={()=>setBeanModal(true)} purchasedBeans={purchasedBeans} index={i} userVerified={userVerified}/>)}
             </div>
           </>
         )}
@@ -1664,7 +1694,7 @@ function MainApp({user}) {
       {withdrawModal&&<WithdrawModal earnedBeans={earnedBeans} bankAccount={bankAccount} onClose={()=>setWithdrawModal(false)} onWithdraw={handleWithdraw}/>}
       {signupModal  &&<SignupModal onClose={()=>setSignupModal(false)} onComplete={handleSignupComplete}/>}
       {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);}}/>}
-      {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} totalBeans={totalBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
+      {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} purchasedBeans={purchasedBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
       {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
       {myPageModal  &&<MyPage onClose={()=>setMyPageModal(false)} user={user} purchasedBeans={purchasedBeans} earnedBeans={earnedBeans} bankAccount={bankAccount} onWithdraw={()=>setWithdrawModal(true)} onCharge={()=>setBeanModal(true)}/>}
     </div>
