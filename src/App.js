@@ -152,7 +152,7 @@ function BeanModal({onClose,onBuy,user}) {
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <DripIcon size={15}/>
             <span style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</span>
-            <span style={{fontSize:12,color:T.muted}}>— 서비스 이용 + 출금 가능</span>
+            <span style={{fontSize:12,color:T.muted}}>— 출금 전용, 서비스 이용 불가</span>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -657,7 +657,7 @@ function RegisterReviewerModal({onClose,onRegister,userVerified,onGoVerify}) {
               onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
           </div>
           <div style={{background:T.dripBg,borderRadius:8,padding:"10px 14px",fontSize:12,color:T.drip,border:`1px solid ${T.coffeeLt}`,lineHeight:1.6,display:"flex",alignItems:"flex-start",gap:6}}>
-            <DripIcon size={14}/> 리뷰 완료 후 지정 가격만큼 <strong>수익빈</strong>으로 지급됩니다. 서비스 이용 및 출금 모두 가능해요.
+            <DripIcon size={14}/> 리뷰 완료 후 지정 가격만큼 <strong>수익빈</strong>으로 지급됩니다. 수익빈은 현금으로 출금 가능해요.
           </div>
           <button onClick={()=>{onRegister(f);onClose();}} style={{background:T.coffee,border:"none",borderRadius:7,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>등록 완료</button>
         </div>
@@ -1022,7 +1022,10 @@ function sendNotification(title, body) {
 
 /* ── My Page ─────────────────────────────────── */
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
-  const [tab,setTab]=useState("beans"); // beans | coffee | resume | answers
+  const [tab,setTab]=useState("beans");
+  const [feedbackOpen,setFeedbackOpen]=useState(false);
+  const [feedbackText,setFeedbackText]=useState("");
+  const [feedbackSent,setFeedbackSent]=useState(false);
   const [chatHistory]=useState([
     {id:1,name:"김지수",role:"Product Manager",company:"카카오",date:"2025.04.20",status:"답변대기"},
     {id:2,name:"오재원",role:"Data Scientist",company:"네이버",date:"2025.04.18",status:"완료"},
@@ -1050,8 +1053,40 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
         <div style={{background:T.coffee,padding:"32px 24px 24px",flexShrink:0}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:16}}>
             <button onClick={onClose} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>← 닫기</button>
-            <button onClick={async()=>{await supabase.auth.signOut();window.location.reload();}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>로그아웃</button>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={()=>setFeedbackOpen(true)} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:11,cursor:"pointer"}}>불편사항 접수</button>
+              <button onClick={async()=>{await supabase.auth.signOut();window.location.reload();}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:20,padding:"5px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>로그아웃</button>
+            </div>
           </div>
+
+          {/* 불편사항 접수 폼 */}
+          {feedbackOpen&&(
+            <div style={{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"14px",marginBottom:14}}>
+              {feedbackSent?(
+                <p style={{fontSize:13,color:"#fff",textAlign:"center"}}>✅ 접수됐어요. 소중한 의견 감사해요!</p>
+              ):(
+                <>
+                  <p style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginBottom:8}}>불편하셨던 점을 알려주세요</p>
+                  <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="어떤 점이 불편하셨나요?" rows={3}
+                    style={{width:"100%",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:7,padding:"8px 10px",fontSize:12,color:"#fff",resize:"none",outline:"none",boxSizing:"border-box",lineHeight:1.5}}/>
+                  <div style={{display:"flex",gap:6,marginTop:8}}>
+                    <button onClick={async()=>{
+                      if(!feedbackText.trim()) return;
+                      await supabase.from("bean_transactions").insert({
+                        user_id:user?.id, type:"feedback", amount:0,
+                        description:`[불편사항] ${feedbackText}`
+                      });
+                      setFeedbackSent(true);
+                      setFeedbackText("");
+                    }} style={{flex:1,background:"#fff",border:"none",borderRadius:7,padding:"8px",color:T.coffee,fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                      접수하기
+                    </button>
+                    <button onClick={()=>{setFeedbackOpen(false);setFeedbackText("");}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:7,padding:"8px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>취소</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <div style={{display:"flex",alignItems:"center",gap:14}}>
             <div style={{width:52,height:52,borderRadius:"50%",background:"rgba(255,255,255,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22,fontFamily:"'Noto Serif KR',serif",color:"#fff",fontWeight:600}}>
               {user?.name?.[0]||"U"}
@@ -1113,7 +1148,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                       <DripIcon size={18}/>
                       <div>
                         <div style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</div>
-                        <div style={{fontSize:11,color:T.muted}}>서비스 이용 + 출금 가능</div>
+                        <div style={{fontSize:11,color:T.muted}}>출금 전용</div>
                       </div>
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
@@ -1202,10 +1237,15 @@ function AdminPanel({onClose}) {
   const [done,setDone]=useState("");
   const [search,setSearch]=useState("");
 
+  const [feedbacks,setFeedbacks]=useState([]);
+
   useEffect(()=>{
     async function load(){
       const {data}=await supabase.from("profiles").select("*").order("created_at",{ascending:false});
       if(data) setUsers(data);
+      const {data:fb}=await supabase.from("bean_transactions")
+        .select("*").eq("type","feedback").order("created_at",{ascending:false}).limit(20);
+      if(fb) setFeedbacks(fb);
       setLoading(false);
     }
     load();
@@ -1309,6 +1349,22 @@ function AdminPanel({onClose}) {
             </div>
             {done&&<div style={{marginTop:8,fontSize:12,color:T.green,fontWeight:500}}>{done}</div>}
           </div>
+        )}
+
+        {/* 불편사항 */}
+        {feedbacks.length>0&&(
+          <>
+            <div style={{height:1,background:T.border,margin:"20px 0"}}/>
+            <h3 style={{fontSize:14,fontWeight:600,color:T.heading,marginBottom:12}}>📋 불편사항 접수 내역</h3>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {feedbacks.map(fb=>(
+                <div key={fb.id} style={{background:T.surface,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
+                  <div style={{fontSize:12,color:T.body,lineHeight:1.6}}>{fb.description?.replace("[불편사항] ","")}</div>
+                  <div style={{fontSize:10,color:T.muted,marginTop:4}}>{new Date(fb.created_at).toLocaleDateString("ko-KR")}</div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
     </div>
@@ -1492,9 +1548,14 @@ function MainApp({user}) {
     return ok;
   }
 
-  async function handleReviewReq(price){
+  async function handleReviewReq(price, reviewerId){
     if(purchasedBeans<price){setBeanModal(true);return false;}
-    return await spendBeans(price);
+    const ok = await spendBeans(price);
+    if(ok && reviewerId){
+      const payout = Math.floor(price * 0.9); // 10% 플랫폼 운영비
+      await supabase.rpc("add_earned_beans",{user_id:reviewerId, amount:payout});
+    }
+    return ok;
   }
 
   function handleBuy(pkg){
@@ -1529,13 +1590,14 @@ function MainApp({user}) {
     const ans = qaList.find(q=>q.id===qaId)?.answers.find(a=>a.id===ansId);
     const qa  = qaList.find(q=>q.id===qaId);
     if(ans?.author_id && qa?.bounty){
-      await supabase.rpc("add_earned_beans",{user_id:ans.author_id, amount:qa.bounty});
+      const payout = Math.floor(qa.bounty * 0.9); // 10% 플랫폼 운영비
+      await supabase.rpc("add_earned_beans",{user_id:ans.author_id, amount:payout});
     }
     setQaList(list=>list.map(q=>{
       if(q.id!==qaId) return q;
       return {...q,adopted:true,answers:q.answers.map(a=>({...a,adopted:a.id===ansId}))};
     }));
-    sendNotification("⭐ 베스트 답변 채택", `${qa?.bounty}빈이 수익빈으로 지급됐어요!`);
+    sendNotification("⭐ 베스트 답변 채택", `${Math.floor(qa?.bounty * 0.9)}빈이 수익빈으로 지급됐어요!`);
   }
 
   function handleRefund(qaId){
@@ -1608,7 +1670,7 @@ function MainApp({user}) {
         <div style={{maxWidth:960,margin:"0 auto",padding:"0 24px",display:"flex",borderTop:`1px solid ${T.border}`}}>
           <button style={tabBtn("chat")} onClick={()=>setTab("chat")}>☕ 커피챗</button>
           <button style={tabBtn("resume")} onClick={()=>setTab("resume")}>📄 레주메 리뷰</button>
-          <button style={tabBtn("qa")} onClick={()=>setTab("qa")}>💬 Q&A</button>
+          <button style={tabBtn("qa")} onClick={()=>setTab("qa")}>💬 현직자 Q&A</button>
         </div>
       </header>
 
@@ -1663,7 +1725,7 @@ function MainApp({user}) {
           <>
             <div style={{display:"flex",alignItems:"flex-end",justifyContent:"space-between",marginBottom:20,flexWrap:"wrap",gap:12}}>
               <div>
-                <h1 style={{fontFamily:"'Instrument Serif',serif",fontSize:30,color:T.heading,fontWeight:400,lineHeight:1.25,marginBottom:6}}>현직자에게<br/>질문하고 빈으로 보상.</h1>
+                <h1 style={{fontFamily:"'Noto Serif KR',serif",fontSize:30,color:T.heading,fontWeight:400,lineHeight:1.25,marginBottom:6}}>현직자에게<br/>직접 물어보세요.</h1>
                 <p style={{fontSize:13,color:T.muted}}>베스트 답변을 채택하면 답변자에게 수익빈이 지급돼요.</p>
               </div>
               <button onClick={()=>setAskModal(true)} style={{background:T.coffee,border:"none",borderRadius:20,padding:"9px 20px",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>✏️ 질문 등록</button>
