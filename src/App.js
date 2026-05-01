@@ -1384,7 +1384,6 @@ function MainApp({user}) {
 
   const [purchasedBeans,setPurchasedBeans]=useState(0);
   const [earnedBeans,setEarnedBeans]=useState(0);
-  const purchasedBeans=purchasedBeans+earnedBeans;
 
   const [userVerified,setUserVerified]=useState(false);
   const [bankAccount,setBankAccount]=useState("");
