@@ -1059,32 +1059,39 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
             </div>
           </div>
 
-          {/* 불편사항 접수 폼 */}
+          {/* 불편사항 팝업 */}
           {feedbackOpen&&(
-            <div style={{background:"rgba(255,255,255,0.12)",borderRadius:10,padding:"14px",marginBottom:14}}>
-              {feedbackSent?(
-                <p style={{fontSize:13,color:"#fff",textAlign:"center"}}>✅ 접수됐어요. 소중한 의견 감사해요!</p>
-              ):(
-                <>
-                  <p style={{fontSize:12,color:"rgba(255,255,255,0.8)",marginBottom:8}}>불편하셨던 점을 알려주세요</p>
-                  <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="어떤 점이 불편하셨나요?" rows={3}
-                    style={{width:"100%",background:"rgba(255,255,255,0.15)",border:"1px solid rgba(255,255,255,0.2)",borderRadius:7,padding:"8px 10px",fontSize:12,color:"#fff",resize:"none",outline:"none",boxSizing:"border-box",lineHeight:1.5}}/>
-                  <div style={{display:"flex",gap:6,marginTop:8}}>
-                    <button onClick={async()=>{
-                      if(!feedbackText.trim()) return;
-                      await supabase.from("bean_transactions").insert({
-                        user_id:user?.id, type:"feedback", amount:0,
-                        description:`[불편사항] ${feedbackText}`
-                      });
-                      setFeedbackSent(true);
-                      setFeedbackText("");
-                    }} style={{flex:1,background:"#fff",border:"none",borderRadius:7,padding:"8px",color:T.coffee,fontWeight:600,fontSize:12,cursor:"pointer"}}>
-                      접수하기
-                    </button>
-                    <button onClick={()=>{setFeedbackOpen(false);setFeedbackText("");}} style={{background:"rgba(255,255,255,0.15)",border:"none",borderRadius:7,padding:"8px 12px",color:"#fff",fontSize:12,cursor:"pointer"}}>취소</button>
+            <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={()=>setFeedbackOpen(false)}>
+              <div style={{background:T.bg,borderRadius:14,padding:"28px",maxWidth:380,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.2)"}} onClick={e=>e.stopPropagation()}>
+                {feedbackSent?(
+                  <div style={{textAlign:"center",padding:"16px 0"}}>
+                    <div style={{fontSize:40,marginBottom:12}}>☕</div>
+                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>소중한 의견 감사해요!</h3>
+                    <p style={{fontSize:13,color:T.muted,marginBottom:20}}>더 나은 브루를 만들기 위해 반영할게요.</p>
+                    <button onClick={()=>{setFeedbackOpen(false);setFeedbackSent(false);}} style={{background:T.coffee,border:"none",borderRadius:8,padding:"10px 24px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>확인</button>
                   </div>
-                </>
-              )}
+                ):(
+                  <>
+                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:4}}>불편사항 접수</h3>
+                    <p style={{fontSize:12,color:T.muted,marginBottom:16}}>불편하셨던 점을 알려주시면 빠르게 개선할게요.</p>
+                    <textarea value={feedbackText} onChange={e=>setFeedbackText(e.target.value)} placeholder="어떤 점이 불편하셨나요?" rows={4}
+                      style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",fontSize:13,color:T.heading,resize:"none",outline:"none",boxSizing:"border-box",lineHeight:1.6}}
+                      onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+                    <div style={{display:"flex",gap:8,marginTop:12}}>
+                      <button onClick={async()=>{
+                        if(!feedbackText.trim()) return;
+                        await supabase.from("bean_transactions").insert({
+                          user_id:user?.id, type:"feedback", amount:0,
+                          description:`[불편사항] ${feedbackText}`
+                        });
+                        setFeedbackSent(true);
+                        setFeedbackText("");
+                      }} style={{flex:1,background:T.coffee,border:"none",borderRadius:8,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>접수하기</button>
+                      <button onClick={()=>{setFeedbackOpen(false);setFeedbackText("");}} style={{background:T.tag,border:"none",borderRadius:8,padding:"10px 16px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
           <div style={{display:"flex",alignItems:"center",gap:14}}>
@@ -1120,7 +1127,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
           <button style={tabStyle("beans")} onClick={()=>setTab("beans")}>빈</button>
           <button style={tabStyle("coffee")} onClick={()=>setTab("coffee")}>☕</button>
           <button style={tabStyle("resume")} onClick={()=>setTab("resume")}>📄</button>
-          <button style={tabStyle("answers")} onClick={()=>setTab("answers")}>✏️</button>
+          <button style={tabStyle("answers")} onClick={()=>setTab("answers")}>💬</button>
         </div>
 
         {/* Content */}
@@ -1153,7 +1160,6 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
                   </div>
-                  <div style={{height:1,background:T.border}}/>
                 </div>
               </div>
             </div>
@@ -1624,7 +1630,7 @@ function MainApp({user}) {
   const sorted=[...filtered];
   const filtRev=filter==="전체"?reviewers:reviewers.filter(r=>r.industry===filter);
 
-  const tabBtn=(id)=>({background:"none",border:"none",padding:"12px 20px",fontSize:14,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s"});
+  const tabBtn=(id)=>({background:"none",border:"none",padding:"12px 14px",fontSize:13,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s",whiteSpace:"nowrap"});
 
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg}}>
@@ -1667,7 +1673,7 @@ function MainApp({user}) {
         </div>
 
         {/* Tabs */}
-        <div style={{maxWidth:960,margin:"0 auto",padding:"0 24px",display:"flex",borderTop:`1px solid ${T.border}`}}>
+        <div style={{maxWidth:960,margin:"0 auto",padding:"0 16px",display:"flex",borderTop:`1px solid ${T.border}`,overflowX:"auto"}}>
           <button style={tabBtn("chat")} onClick={()=>setTab("chat")}>☕ 커피챗</button>
           <button style={tabBtn("resume")} onClick={()=>setTab("resume")}>📄 레주메 리뷰</button>
           <button style={tabBtn("qa")} onClick={()=>setTab("qa")}>💬 현직자 Q&A</button>
