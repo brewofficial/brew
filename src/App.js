@@ -420,42 +420,77 @@ function SignupModal({onClose,onComplete,initialStep=1}) {
 
 /* ── Verify Only Modal (리뷰어 등록용) ──────── */
 function VerifyOnlyModal({onClose,onComplete}) {
-  const [f,setF]=useState({name:"",email:"",bank:""});
-  const [cardFile,setCardFile]=useState("");
-  const [codeSent,setCodeSent]=useState(false);
-  const [code,setCode]=useState("");
+  const [f,setF]=useState({email:"",bank:""});
+  const [cardFile,setCardFile]=useState(null);
+  const [submitting,setSubmitting]=useState(false);
+  const [done,setDone]=useState(false);
   const set=(k,v)=>setF(x=>({...x,[k]:v}));
+
+  async function handleSubmit(){
+    setSubmitting(true);
+    try {
+      const {data:{user}} = await supabase.auth.getUser();
+      if(!user) return;
+
+      let card_image_url = "";
+
+      // 명함 이미지 Storage 업로드
+      if(cardFile){
+        const ext = cardFile.name.split('.').pop();
+        const path = `${user.id}/card_${Date.now()}.${ext}`;
+        const {error:upErr} = await supabase.storage.from("cards").upload(path, cardFile);
+        if(!upErr){
+          const {data:urlData} = supabase.storage.from("cards").getPublicUrl(path);
+          card_image_url = urlData?.publicUrl || path;
+        }
+      }
+
+      await supabase.from("verification_requests").insert({
+        user_id: user.id,
+        email: f.email,
+        bank_account: f.bank,
+        card_image_url,
+        status: "pending"
+      });
+
+      setDone(true);
+    } catch(e){ console.error(e); }
+    setSubmitting(false);
+  }
+
+  if(done) return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}}>
+      <div style={{background:T.bg,borderRadius:14,padding:"32px 28px",maxWidth:380,width:"100%",textAlign:"center",boxShadow:"0 16px 48px rgba(28,20,16,0.18)"}}>
+        <div style={{fontSize:40,marginBottom:12}}>📬</div>
+        <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>인증 신청 완료!</h3>
+        <p style={{fontSize:13,color:T.muted,lineHeight:1.7,marginBottom:20}}>영업일 3일 이내로 검토 후 승인 알림을 보내드려요.</p>
+        <button onClick={()=>{onComplete({verified:false,bank:f.bank});onClose();}} style={{background:T.coffee,border:"none",borderRadius:8,padding:"10px 28px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>확인</button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
       <div style={{background:T.bg,borderRadius:14,padding:"28px 28px 22px",maxWidth:460,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-        <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:20,color:T.heading,fontWeight:400,marginBottom:4}}>명함 + 이메일 인증</h2>
+        <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:20,color:T.heading,fontWeight:400,marginBottom:4}}>명함 인증</h2>
         <p style={{fontSize:13,color:T.muted,marginBottom:20}}>인증 완료 후 레주메 리뷰어 등록이 활성화됩니다.</p>
         <div style={{display:"flex",flexDirection:"column",gap:13}}>
           {/* 명함 업로드 */}
           <div>
-            <Lbl>명함 사진</Lbl>
+            <Lbl>명함 사진 *</Lbl>
             <div style={{border:`1px dashed ${cardFile?T.coffee:T.border}`,borderRadius:7,padding:"16px",textAlign:"center",cursor:"pointer",background:cardFile?T.tag:"none"}}
-              onClick={()=>document.getElementById("verify-card").click()}>
-              <input id="verify-card" type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>setCardFile(e.target.files[0]?.name||"")}/>
+              onClick={()=>document.getElementById("verify-card-only").click()}>
+              <input id="verify-card-only" type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>setCardFile(e.target.files[0]||null)}/>
               {cardFile
-                ? <div style={{fontSize:13,color:T.coffee,fontWeight:500}}>✓ {cardFile}</div>
-                : <><div style={{fontSize:20,marginBottom:4}}>📎</div><div style={{fontSize:13,color:T.muted}}>명함 첨부 (클릭)</div></>
+                ? <div style={{fontSize:13,color:T.coffee,fontWeight:500}}>✓ {cardFile.name}</div>
+                : <><div style={{fontSize:20,marginBottom:4}}>📎</div><div style={{fontSize:13,color:T.muted}}>명함 사진 첨부 (클릭)</div><div style={{fontSize:11,color:T.muted,marginTop:2}}>JPG, PNG, PDF 지원</div></>
               }
             </div>
           </div>
           {/* 직장 이메일 */}
           <div>
             <Lbl>직장 이메일</Lbl>
-            <div style={{display:"flex",gap:8}}>
-              <Inp value={f.email} onChange={e=>set("email",e.target.value)} placeholder="hong@company.com" type="email"/>
-              <button onClick={()=>setCodeSent(true)} style={{background:T.coffee,border:"none",borderRadius:7,padding:"9px 14px",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>인증코드 전송</button>
-            </div>
-            {codeSent&&(
-              <div style={{marginTop:8}}>
-                <Inp value={code} onChange={e=>setCode(e.target.value)} placeholder="인증코드 6자리"/>
-              </div>
-            )}
+            <Inp value={f.email} onChange={e=>set("email",e.target.value)} placeholder="hong@company.com" type="email"/>
           </div>
           {/* 입금 계좌 */}
           <div>
@@ -464,22 +499,12 @@ function VerifyOnlyModal({onClose,onComplete}) {
             <p style={{fontSize:11,color:T.muted,marginTop:4}}>수익빈을 현금으로 전환할 때 사용돼요.</p>
           </div>
           <div style={{background:"#fdf8ec",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#8a6d00",border:"1px solid #f0dfa0",lineHeight:1.6}}>
-            💡 인증 완료 후 <strong>레주메 리뷰어 등록</strong>이 활성화됩니다. 승인은 영업일 3일 이내예요.
+            💡 승인은 영업일 3일 이내이며, 승인 시 알림을 보내드려요.
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={async()=>{
-              const {data:{user}} = await supabase.auth.getUser();
-              if(user){
-                await supabase.from("verification_requests").insert({
-                  user_id: user.id,
-                  email: f.email,
-                  bank_account: f.bank,
-                  status: "pending"
-                });
-              }
-              onComplete({verified:false, bank:f.bank});
-              onClose();
-            }} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>인증 신청 완료</button>
+            <button onClick={handleSubmit} disabled={!cardFile||submitting} style={{flex:1,background:cardFile&&!submitting?T.coffee:T.tag,border:"none",borderRadius:7,padding:"10px",color:cardFile&&!submitting?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:cardFile&&!submitting?"pointer":"not-allowed"}}>
+              {submitting?"신청 중…":"인증 신청하기"}
+            </button>
             <button onClick={onClose} style={{background:T.tag,border:"none",borderRadius:7,padding:"10px 16px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
           </div>
         </div>
@@ -1117,6 +1142,20 @@ function sendNotification(title, body) {
 /* ── My Page ─────────────────────────────────── */
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
   const [tab,setTab]=useState("beans");
+  const [verifyNotifs,setVerifyNotifs]=useState([]);
+
+  useEffect(()=>{
+    async function loadNotifs(){
+      if(!user?.id) return;
+      const {data}=await supabase.from("bean_transactions")
+        .select("*")
+        .eq("user_id",user.id)
+        .in("type",["verify_approved","verify_rejected"])
+        .order("created_at",{ascending:false});
+      if(data) setVerifyNotifs(data);
+    }
+    loadNotifs();
+  },[user?.id]);
   const [feedbackOpen,setFeedbackOpen]=useState(false);
   const [feedbackText,setFeedbackText]=useState("");
   const [feedbackSent,setFeedbackSent]=useState(false);
@@ -1230,6 +1269,21 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
           {/* 빈 현황 */}
           {tab==="beans"&&(
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
+              {/* 인증 알림 */}
+              {verifyNotifs.map(n=>(
+                <div key={n.id} style={{background:n.type==="verify_approved"?T.greenBg:"#fff5f5",borderRadius:10,padding:"14px 16px",border:`1px solid ${n.type==="verify_approved"?T.green:"#fca5a5"}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                  <div>
+                    <div style={{fontSize:13,fontWeight:600,color:n.type==="verify_approved"?T.green:T.red,marginBottom:4}}>
+                      {n.type==="verify_approved"?"✅ 인증 승인":"❌ 인증 거절"}
+                    </div>
+                    <div style={{fontSize:12,color:T.body,lineHeight:1.6}}>{n.description?.replace("인증이 승인됐어요! ","").replace("인증이 거절됐어요. 사유: ","")}</div>
+                  </div>
+                  <button onClick={async()=>{
+                    await supabase.from("bean_transactions").delete().eq("id",n.id);
+                    setVerifyNotifs(ns=>ns.filter(x=>x.id!==n.id));
+                  }} style={{background:"none",border:"none",fontSize:14,color:T.muted,cursor:"pointer",flexShrink:0}}>✕</button>
+                </div>
+              ))}
               <div style={{background:T.surface,borderRadius:10,padding:"16px",border:`1px solid ${T.border}`}}>
                 <div style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>빈 종류 안내</div>
                 <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1338,6 +1392,8 @@ function AdminPanel({onClose}) {
   const [search,setSearch]=useState("");
   const [showAllUsers,setShowAllUsers]=useState(false);
   const [showTodayUsers,setShowTodayUsers]=useState(false);
+  const [rejectTarget,setRejectTarget]=useState(null);
+  const [rejectReason,setRejectReason]=useState("");
 
   const [feedbacks,setFeedbacks]=useState([]);
   const [verifyReqs,setVerifyReqs]=useState([]);
@@ -1523,6 +1579,9 @@ function AdminPanel({onClose}) {
                     <div style={{fontSize:12,color:T.muted,marginLeft:28}}>
                       <div>직장 이메일: {vr.email||"미입력"}</div>
                       <div>입금 계좌: {vr.bank_account||"미입력"}</div>
+                      {vr.card_image_url&&(
+                        <a href={vr.card_image_url} target="_blank" rel="noreferrer" style={{color:T.coffee,fontSize:11,display:"inline-block",marginTop:4}}>📎 명함 보기</a>
+                      )}
                       <div style={{fontSize:11,marginTop:2}}>{new Date(vr.created_at).toLocaleDateString("ko-KR")}</div>
                     </div>
                   </div>
@@ -1530,16 +1589,48 @@ function AdminPanel({onClose}) {
                     <button onClick={async()=>{
                       await supabase.from("profiles").update({verified:true,bank_account:vr.bank_account}).eq("id",vr.user_id);
                       await supabase.from("verification_requests").update({status:"approved"}).eq("id",vr.id);
+                      // 승인 알림 — bean_transactions에 기록
+                      await supabase.from("bean_transactions").insert({
+                        user_id:vr.user_id, type:"verify_approved", amount:0,
+                        description:"인증이 승인됐어요! 레주메 리뷰어로 등록할 수 있어요."
+                      });
+                      sendNotification("✅ 인증 승인","레주메 리뷰어로 등록할 수 있어요!");
                       setVerifyReqs(vrs=>vrs.filter(v=>v.id!==vr.id));
                     }} style={{background:T.green,border:"none",borderRadius:7,padding:"6px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ 승인</button>
-                    <button onClick={async()=>{
-                      await supabase.from("verification_requests").update({status:"rejected"}).eq("id",vr.id);
-                      setVerifyReqs(vrs=>vrs.filter(v=>v.id!==vr.id));
-                    }} style={{background:T.tag,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 12px",color:T.muted,fontSize:12,cursor:"pointer"}}>✕ 거절</button>
+                    <button onClick={()=>setRejectTarget(vr)} style={{background:T.tag,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 12px",color:T.muted,fontSize:12,cursor:"pointer"}}>✕ 거절</button>
                   </div>
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* 거절 사유 팝업 */}
+        {rejectTarget&&(
+          <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,padding:20}}>
+            <div style={{background:T.bg,borderRadius:14,padding:"28px",maxWidth:380,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.2)"}}>
+              <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:17,color:T.heading,fontWeight:400,marginBottom:4}}>거절 사유 입력</h3>
+              <p style={{fontSize:12,color:T.muted,marginBottom:14}}>{rejectTarget.profiles?.name||"해당 신청자"}에게 전달돼요.</p>
+              <textarea value={rejectReason} onChange={e=>setRejectReason(e.target.value)} placeholder="거절 사유를 입력해주세요" rows={4}
+                style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px 12px",fontSize:13,color:T.heading,resize:"none",outline:"none",boxSizing:"border-box",lineHeight:1.6}}
+                onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+              <div style={{display:"flex",gap:8,marginTop:12}}>
+                <button onClick={async()=>{
+                  await supabase.from("verification_requests").update({
+                    status:"rejected", reject_reason:rejectReason
+                  }).eq("id",rejectTarget.id);
+                  // 거절 알림 기록
+                  await supabase.from("bean_transactions").insert({
+                    user_id:rejectTarget.user_id, type:"verify_rejected", amount:0,
+                    description:`인증이 거절됐어요. 사유: ${rejectReason}`
+                  });
+                  setVerifyReqs(vrs=>vrs.filter(v=>v.id!==rejectTarget.id));
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }} disabled={!rejectReason.trim()} style={{flex:1,background:rejectReason.trim()?T.coffee:T.tag,border:"none",borderRadius:8,padding:"10px",color:rejectReason.trim()?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:rejectReason.trim()?"pointer":"not-allowed"}}>거절 전송</button>
+                <button onClick={()=>{setRejectTarget(null);setRejectReason("");}} style={{background:T.tag,border:"none",borderRadius:8,padding:"10px 16px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
+              </div>
+            </div>
           </div>
         )}
         {feedbacks.length>0&&(
@@ -1833,6 +1924,20 @@ function MainApp({user}) {
       }
     }
   }
+
+  // 승인 상태 주기적 체크 (30초마다)
+  useEffect(()=>{
+    if(!user?.id || userVerified) return;
+    const interval = setInterval(async()=>{
+      const {data} = await supabase.from("profiles").select("verified,bank_account").eq("id",user.id).single();
+      if(data?.verified){
+        setUserVerified(true);
+        if(data.bank_account) setBankAccount(data.bank_account);
+        clearInterval(interval);
+      }
+    }, 30000);
+    return ()=>clearInterval(interval);
+  },[user?.id, userVerified]);
 
   const filtered=filter==="전체"?profiles:profiles.filter(p=>p.industry===filter);
   const filtQa=(filter==="전체"?qaList:qaList.filter(q=>q.industry===filter)).filter(q=>!q.refunded);
