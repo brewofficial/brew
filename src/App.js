@@ -147,12 +147,12 @@ function BeanModal({onClose,onBuy,user}) {
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span>🫘</span>
             <span style={{fontSize:13,fontWeight:600,color:T.heading}}>구매빈</span>
-            <span style={{fontSize:12,color:T.muted}}>— 서비스 이용 전용, 출금 불가</span>
+            <span style={{fontSize:12,color:T.muted}}>— 서비스 이용 전용</span>
           </div>
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <DripIcon size={15}/>
             <span style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</span>
-            <span style={{fontSize:12,color:T.muted}}>— 출금 전용, 서비스 이용 불가</span>
+            <span style={{fontSize:12,color:T.muted}}>— 출금 전용</span>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -1155,7 +1155,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                       <DripIcon size={18}/>
                       <div>
                         <div style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</div>
-                        <div style={{fontSize:11,color:T.muted}}>출금 전용</div>
+                        <div style={{fontSize:11,color:T.muted}}>서비스 이용 불가, 출금 전용</div>
                       </div>
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
