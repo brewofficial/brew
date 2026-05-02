@@ -1361,16 +1361,39 @@ function AdminPanel({onClose}) {
         {feedbacks.length>0&&(
           <>
             <div style={{height:1,background:T.border,margin:"20px 0"}}/>
-            <h3 style={{fontSize:14,fontWeight:600,color:T.heading,marginBottom:12}}>📋 불편사항 접수 내역</h3>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+              <h3 style={{fontSize:14,fontWeight:600,color:T.heading}}>📋 불편사항 접수 내역</h3>
+              <span style={{fontSize:12,color:T.muted}}>{feedbacks.length}건</span>
+            </div>
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              {feedbacks.map(fb=>(
-                <div key={fb.id} style={{background:T.surface,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`}}>
-                  <div style={{fontSize:12,color:T.body,lineHeight:1.6}}>{fb.description?.replace("[불편사항] ","")}</div>
-                  <div style={{fontSize:10,color:T.muted,marginTop:4}}>{new Date(fb.created_at).toLocaleDateString("ko-KR")}</div>
+              {feedbacks.map((fb,i)=>(
+                <div key={fb.id} style={{background:T.surface,borderRadius:8,padding:"10px 14px",border:`1px solid ${T.border}`,display:"flex",gap:10,alignItems:"flex-start"}}>
+                  {/* 번호 */}
+                  <div style={{minWidth:22,height:22,borderRadius:"50%",background:T.tag,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:T.coffee,flexShrink:0,marginTop:1}}>
+                    {i+1}
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:T.body,lineHeight:1.6}}>{fb.description?.replace("[불편사항] ","")}</div>
+                    <div style={{fontSize:10,color:T.muted,marginTop:4}}>{new Date(fb.created_at).toLocaleDateString("ko-KR")}</div>
+                  </div>
+                  {/* 체크 버튼 — 누르면 해당 건 삭제 */}
+                  <button onClick={async()=>{
+                    await supabase.from("bean_transactions").delete().eq("id",fb.id);
+                    setFeedbacks(fbs=>fbs.filter(f=>f.id!==fb.id));
+                  }} title="처리 완료" style={{background:"none",border:`1px solid ${T.border}`,borderRadius:"50%",width:26,height:26,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0,fontSize:12,color:T.muted,transition:"all 0.15s"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background=T.green;e.currentTarget.style.color="#fff";e.currentTarget.style.borderColor=T.green;}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="none";e.currentTarget.style.color=T.muted;e.currentTarget.style.borderColor=T.border;}}>
+                    ✓
+                  </button>
                 </div>
               ))}
             </div>
           </>
+        )}
+        {feedbacks.length===0&&(
+          <div style={{marginTop:20,textAlign:"center",fontSize:12,color:T.muted,padding:"12px 0"}}>
+            접수된 불편사항이 없어요 ✓
+          </div>
         )}
       </div>
     </div>
@@ -1630,7 +1653,7 @@ function MainApp({user}) {
   const sorted=[...filtered];
   const filtRev=filter==="전체"?reviewers:reviewers.filter(r=>r.industry===filter);
 
-  const tabBtn=(id)=>({background:"none",border:"none",padding:"12px 14px",fontSize:13,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s",whiteSpace:"nowrap"});
+  const tabBtn=(id)=>({flex:1,background:"none",border:"none",padding:"12px 8px",fontSize:13,fontWeight:tab===id?600:400,color:tab===id?T.coffee:T.muted,cursor:"pointer",borderBottom:tab===id?`2px solid ${T.coffee}`:"2px solid transparent",transition:"color 0.15s",whiteSpace:"nowrap",textAlign:"center"});
 
   if(loading) return (
     <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:T.bg}}>
