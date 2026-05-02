@@ -152,7 +152,7 @@ function BeanModal({onClose,onBuy,user}) {
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <DripIcon size={15}/>
             <span style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</span>
-            <span style={{fontSize:12,color:T.muted}}>— 서비스 이용 불가, 출금 전용</span>
+            <span style={{fontSize:12,color:T.muted}}>— 출금 전용</span>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -418,7 +418,65 @@ function SignupModal({onClose,onComplete,initialStep=1}) {
 }
 
 
-/* ── Profile Card ───────────────────────────── */
+/* ── Verify Only Modal (리뷰어 등록용) ──────── */
+function VerifyOnlyModal({onClose,onComplete}) {
+  const [f,setF]=useState({name:"",email:"",bank:""});
+  const [cardFile,setCardFile]=useState("");
+  const [codeSent,setCodeSent]=useState(false);
+  const [code,setCode]=useState("");
+  const set=(k,v)=>setF(x=>({...x,[k]:v}));
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
+      <div style={{background:T.bg,borderRadius:14,padding:"28px 28px 22px",maxWidth:460,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.18)",maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:20,color:T.heading,fontWeight:400,marginBottom:4}}>명함 + 이메일 인증</h2>
+        <p style={{fontSize:13,color:T.muted,marginBottom:20}}>인증 완료 후 레주메 리뷰어 등록이 활성화됩니다.</p>
+        <div style={{display:"flex",flexDirection:"column",gap:13}}>
+          {/* 명함 업로드 */}
+          <div>
+            <Lbl>명함 사진</Lbl>
+            <div style={{border:`1px dashed ${cardFile?T.coffee:T.border}`,borderRadius:7,padding:"16px",textAlign:"center",cursor:"pointer",background:cardFile?T.tag:"none"}}
+              onClick={()=>document.getElementById("verify-card").click()}>
+              <input id="verify-card" type="file" accept="image/*,.pdf" style={{display:"none"}} onChange={e=>setCardFile(e.target.files[0]?.name||"")}/>
+              {cardFile
+                ? <div style={{fontSize:13,color:T.coffee,fontWeight:500}}>✓ {cardFile}</div>
+                : <><div style={{fontSize:20,marginBottom:4}}>📎</div><div style={{fontSize:13,color:T.muted}}>명함 첨부 (클릭)</div></>
+              }
+            </div>
+          </div>
+          {/* 직장 이메일 */}
+          <div>
+            <Lbl>직장 이메일</Lbl>
+            <div style={{display:"flex",gap:8}}>
+              <Inp value={f.email} onChange={e=>set("email",e.target.value)} placeholder="hong@company.com" type="email"/>
+              <button onClick={()=>setCodeSent(true)} style={{background:T.coffee,border:"none",borderRadius:7,padding:"9px 14px",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>인증코드 전송</button>
+            </div>
+            {codeSent&&(
+              <div style={{marginTop:8}}>
+                <Inp value={code} onChange={e=>setCode(e.target.value)} placeholder="인증코드 6자리"/>
+              </div>
+            )}
+          </div>
+          {/* 입금 계좌 */}
+          <div>
+            <Lbl>입금 계좌 (수익빈 출금용)</Lbl>
+            <Inp value={f.bank} onChange={e=>set("bank",e.target.value)} placeholder="카카오뱅크 3333-12-3456789"/>
+            <p style={{fontSize:11,color:T.muted,marginTop:4}}>수익빈을 현금으로 전환할 때 사용돼요.</p>
+          </div>
+          <div style={{background:"#fdf8ec",borderRadius:8,padding:"10px 14px",fontSize:12,color:"#8a6d00",border:"1px solid #f0dfa0",lineHeight:1.6}}>
+            💡 인증 완료 후 <strong>레주메 리뷰어 등록</strong>이 활성화됩니다. 승인은 영업일 3일 이내예요.
+          </div>
+          <div style={{display:"flex",gap:8}}>
+            <button onClick={()=>{onComplete({verified:true,bank:f.bank});onClose();}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>인증 신청 완료</button>
+            <button onClick={onClose} style={{background:T.tag,border:"none",borderRadius:7,padding:"10px 16px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function ProfileCard({p,onUnlock,onSend,purchasedBeans,viewCount,index}) {
   const [open,setOpen]=useState(false);
   const [msg,setMsg]=useState("");
@@ -1179,7 +1237,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                       <DripIcon size={18}/>
                       <div>
                         <div style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</div>
-                        <div style={{fontSize:11,color:T.muted}}>서비스 이용 불가, 출금 전용</div>
+                        <div style={{fontSize:11,color:T.muted}}>출금 전용</div>
                       </div>
                     </div>
                     <div style={{fontSize:18,fontWeight:700,color:T.drip}}>{earnedBeans}빈</div>
@@ -1498,6 +1556,7 @@ function MainApp({user}) {
   const [signupModal,setSignupModal]=useState(false);
   const [signupInitialStep,setSignupInitialStep]=useState(1);
   const [revRegModal,setRevRegModal]=useState(false);
+  const [verifyModal,setVerifyModal]=useState(false);
   const [adminModal,setAdminModal]=useState(false);
   const [myPageModal,setMyPageModal]=useState(false);
 
@@ -1799,8 +1858,9 @@ function MainApp({user}) {
 
       {beanModal    &&<BeanModal onClose={()=>setBeanModal(false)} onBuy={handleBuy} user={user}/>}
       {withdrawModal&&<WithdrawModal earnedBeans={earnedBeans} bankAccount={bankAccount} onClose={()=>setWithdrawModal(false)} onWithdraw={handleWithdraw}/>}
-      {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);setSignupInitialStep(2);}}/>}
+      {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setVerifyModal(true);}}/>}
       {signupModal  &&<SignupModal onClose={()=>{setSignupModal(false);setSignupInitialStep(1);}} onComplete={handleSignupComplete} initialStep={signupInitialStep}/>}
+      {verifyModal  &&<VerifyOnlyModal onClose={()=>setVerifyModal(false)} onComplete={handleSignupComplete}/>}
       {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} purchasedBeans={purchasedBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
       {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
       {myPageModal  &&<MyPage onClose={()=>setMyPageModal(false)} user={user} purchasedBeans={purchasedBeans} earnedBeans={earnedBeans} bankAccount={bankAccount} onWithdraw={()=>setWithdrawModal(true)} onCharge={()=>setBeanModal(true)}/>}
