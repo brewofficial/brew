@@ -152,7 +152,7 @@ function BeanModal({onClose,onBuy,user}) {
           <div style={{display:"flex",alignItems:"center",gap:6}}>
             <DripIcon size={15}/>
             <span style={{fontSize:13,fontWeight:600,color:T.drip}}>수익빈</span>
-            <span style={{fontSize:12,color:T.muted}}>— 출금 전용</span>
+            <span style={{fontSize:12,color:T.muted}}>— 서비스 이용 불가, 출금 전용</span>
           </div>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -275,8 +275,8 @@ function WithdrawModal({earnedBeans,bankAccount,onClose,onWithdraw}) {
 /* ── Signup Modal ───────────────────────────── */
 // Step 1: 기본 정보
 // Step 2: 인증 (선택) — 명함+메일 인증하면 레주메 리뷰어 기능 해금
-function SignupModal({onClose,onComplete}) {
-  const [step,setStep]=useState(1);
+function SignupModal({onClose,onComplete,initialStep=1}) {
+  const [step,setStep]=useState(initialStep);
   const [f,setF]=useState({name:"",email:"",role:"",company:"",yoe:""});
   const [wantVerify,setWantVerify]=useState(false);
   const [cardFile,setCardFile]=useState("");
@@ -457,7 +457,7 @@ function ProfileCard({p,onUnlock,onSend,purchasedBeans,viewCount,index}) {
                 {p.verified&&<span style={{color:T.green,marginLeft:4}}>✓ 인증 회원은 답장 확률이 높아요.</span>}
               </div>
               <div style={{display:"flex",gap:7}}>
-                <button onClick={()=>{const ok=onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 5빈</button>
+                <button onClick={async()=>{const ok=await onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 5빈</button>
                 <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
               </div>
             </div>
@@ -728,7 +728,7 @@ function AskModal({onClose,onSubmit,purchasedBeans,onBuyBeans}) {
 }
 
 /* ── QA Card ─────────────────────────────────── */
-function QACard({qa,onAdopt,onRefund,index,currentUserId}) {
+function QACard({qa,onAdopt,onRefund,index,currentUserId,userVerified}) {
   const [open,setOpen]=useState(false);
   const [answer,setAnswer]=useState("");
   const [submitted,setSubmitted]=useState(false);
@@ -828,6 +828,10 @@ function QACard({qa,onAdopt,onRefund,index,currentUserId}) {
                 <div style={{textAlign:"center",fontSize:12,color:T.muted,padding:"6px 0"}}>
                   내가 등록한 질문이에요 · 답변을 기다려주세요
                 </div>
+              ):!userVerified?(
+                <div style={{textAlign:"center",fontSize:12,color:T.muted,padding:"6px 0"}}>
+                  💡 인증된 현직자만 답변할 수 있어요
+                </div>
               ):(
                 <button onClick={()=>setOpen(true)} style={{width:"100%",background:"none",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px",color:T.muted,fontSize:13,cursor:"pointer",transition:"border-color 0.15s"}}
                   onMouseEnter={e=>e.target.style.borderColor=T.coffee} onMouseLeave={e=>e.target.style.borderColor=T.border}>
@@ -899,23 +903,31 @@ function AuthScreen({onLogin}) {
   const [email,setEmail]=useState("");
   const [pw,setPw]=useState("");
   const [pwConfirm,setPwConfirm]=useState("");
+  const [role,setRole]=useState("");
+  const [company,setCompany]=useState("");
+  const [yoe,setYoe]=useState("");
   const [error,setError]=useState("");
   const [loading,setLoading]=useState(false);
-  const [verified,setVerified]=useState(false); // 이메일 인증 대기 상태
+  const [verified,setVerified]=useState(false);
 
   async function handleSubmit(){
     if(!email.trim()||!pw.trim()){setError("이메일과 비밀번호를 입력해주세요.");return;}
     if(mode==="signup"&&pw!==pwConfirm){setError("비밀번호가 일치하지 않아요.");return;}
     setError("");setLoading(true);
     try {
-      // 10초 타임아웃
       const timeout = new Promise((_,reject)=>setTimeout(()=>reject(new Error("timeout")),10000));
       if(mode==="signup"){
-        const {error:err} = await Promise.race([
-          supabase.auth.signUp({email,password:pw,options:{data:{name:name||email.split("@")[0]}}}),
+        const {data,error:err} = await Promise.race([
+          supabase.auth.signUp({email,password:pw,options:{data:{name:name||email.split("@")[0],role,company,yoe:parseInt(yoe)||0}}}),
           timeout
         ]);
         if(err) throw err;
+        // profiles 테이블에 추가 정보 저장
+        if(data?.user){
+          await supabase.from("profiles").update({
+            name:name||email.split("@")[0], role, company, yoe:parseInt(yoe)||0
+          }).eq("id",data.user.id);
+        }
         setVerified(true);
       } else {
         const {data,error:err} = await Promise.race([
@@ -967,18 +979,30 @@ function AuthScreen({onLogin}) {
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {mode==="signup"&&(
-            <input value={name} onChange={e=>setName(e.target.value)} placeholder="이름" style={inp}
+            <input value={name} onChange={e=>setName(e.target.value)} placeholder="이름 *" style={inp}
               onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
           )}
-          <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="이메일" style={inp}
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="이메일 *" style={inp}
             onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
-          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호" style={inp}
+          <input type="password" value={pw} onChange={e=>setPw(e.target.value)} placeholder="비밀번호 *" style={inp}
             onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}
             onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
           {mode==="signup"&&(
-            <input type="password" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} placeholder="비밀번호 확인" style={inp}
-              onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}
-              onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+            <>
+              <input type="password" value={pwConfirm} onChange={e=>setPwConfirm(e.target.value)} placeholder="비밀번호 확인 *" style={inp}
+                onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}
+                onKeyDown={e=>e.key==="Enter"&&handleSubmit()}/>
+              <div style={{height:1,background:T.border}}/>
+              <div style={{display:"flex",gap:8}}>
+                <input value={role} onChange={e=>setRole(e.target.value)} placeholder="현재 직무 (선택)" style={{...inp,flex:2}}
+                  onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+                <input type="number" value={yoe} onChange={e=>setYoe(e.target.value)} placeholder="경력(년)" style={{...inp,flex:1}}
+                  onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+              </div>
+              <input value={company} onChange={e=>setCompany(e.target.value)} placeholder="회사 (선택)" style={inp}
+                onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+              <p style={{fontSize:11,color:T.muted,margin:0}}>💡 직무와 회사를 입력하면 신뢰도가 높아져요</p>
+            </>
           )}
           {error&&<p style={{fontSize:12,color:T.red,margin:0}}>{error}</p>}
           <button onClick={handleSubmit} disabled={loading} style={{background:loading?T.tag:T.coffee,border:"none",borderRadius:10,padding:"13px",color:loading?T.muted:"#fff",fontWeight:600,fontSize:14,cursor:loading?"not-allowed":"pointer",marginTop:4}}>
@@ -1472,6 +1496,7 @@ function MainApp({user}) {
   const [beanModal,setBeanModal]=useState(false);
   const [withdrawModal,setWithdrawModal]=useState(false);
   const [signupModal,setSignupModal]=useState(false);
+  const [signupInitialStep,setSignupInitialStep]=useState(1);
   const [revRegModal,setRevRegModal]=useState(false);
   const [adminModal,setAdminModal]=useState(false);
   const [myPageModal,setMyPageModal]=useState(false);
@@ -1765,7 +1790,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:14}}>
-              {filtQa.filter(qa=>!qa.refunded).map((qa,i)=><QACard key={qa.id} qa={qa} onAdopt={handleAdopt} onRefund={handleRefund} index={i} currentUserId={user?.id}/>)}
+              {filtQa.filter(qa=>!qa.refunded).map((qa,i)=><QACard key={qa.id} qa={qa} onAdopt={handleAdopt} onRefund={handleRefund} index={i} currentUserId={user?.id} userVerified={userVerified}/>)}
             </div>
           </>
         )}
@@ -1774,8 +1799,8 @@ function MainApp({user}) {
 
       {beanModal    &&<BeanModal onClose={()=>setBeanModal(false)} onBuy={handleBuy} user={user}/>}
       {withdrawModal&&<WithdrawModal earnedBeans={earnedBeans} bankAccount={bankAccount} onClose={()=>setWithdrawModal(false)} onWithdraw={handleWithdraw}/>}
-      {signupModal  &&<SignupModal onClose={()=>setSignupModal(false)} onComplete={handleSignupComplete}/>}
-      {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);}}/>}
+      {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setSignupModal(true);setSignupInitialStep(2);}}/>}
+      {signupModal  &&<SignupModal onClose={()=>{setSignupModal(false);setSignupInitialStep(1);}} onComplete={handleSignupComplete} initialStep={signupInitialStep}/>}
       {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} purchasedBeans={purchasedBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
       {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
       {myPageModal  &&<MyPage onClose={()=>setMyPageModal(false)} user={user} purchasedBeans={purchasedBeans} earnedBeans={earnedBeans} bankAccount={bankAccount} onWithdraw={()=>setWithdrawModal(true)} onCharge={()=>setBeanModal(true)}/>}
