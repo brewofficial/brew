@@ -467,7 +467,19 @@ function VerifyOnlyModal({onClose,onComplete}) {
             💡 인증 완료 후 <strong>레주메 리뷰어 등록</strong>이 활성화됩니다. 승인은 영업일 3일 이내예요.
           </div>
           <div style={{display:"flex",gap:8}}>
-            <button onClick={()=>{onComplete({verified:true,bank:f.bank});onClose();}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>인증 신청 완료</button>
+            <button onClick={async()=>{
+              const {data:{user}} = await supabase.auth.getUser();
+              if(user){
+                await supabase.from("verification_requests").insert({
+                  user_id: user.id,
+                  email: f.email,
+                  bank_account: f.bank,
+                  status: "pending"
+                });
+              }
+              onComplete({verified:false, bank:f.bank});
+              onClose();
+            }} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"10px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>인증 신청 완료</button>
             <button onClick={onClose} style={{background:T.tag,border:"none",borderRadius:7,padding:"10px 16px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
           </div>
         </div>
@@ -1324,8 +1336,11 @@ function AdminPanel({onClose}) {
   const [beanType,setBeanType]=useState("purchased");
   const [done,setDone]=useState("");
   const [search,setSearch]=useState("");
+  const [showAllUsers,setShowAllUsers]=useState(false);
+  const [showTodayUsers,setShowTodayUsers]=useState(false);
 
   const [feedbacks,setFeedbacks]=useState([]);
+  const [verifyReqs,setVerifyReqs]=useState([]);
 
   useEffect(()=>{
     async function load(){
@@ -1334,6 +1349,18 @@ function AdminPanel({onClose}) {
       const {data:fb}=await supabase.from("bean_transactions")
         .select("*").eq("type","feedback").order("created_at",{ascending:false}).limit(20);
       if(fb) setFeedbacks(fb);
+      const {data:vr}=await supabase.from("verification_requests")
+        .select("*").eq("status","pending").order("created_at",{ascending:false});
+      if(vr){
+        // profiles 정보 별도 조회
+        const userIds=[...new Set(vr.map(v=>v.user_id).filter(Boolean))];
+        let profileMap={};
+        if(userIds.length>0){
+          const {data:profs}=await supabase.from("profiles").select("id,name,email").in("id",userIds);
+          if(profs) profs.forEach(p=>{profileMap[p.id]=p;});
+        }
+        setVerifyReqs(vr.map(v=>({...v,profiles:profileMap[v.user_id]||{}})));
+      }
       setLoading(false);
     }
     load();
@@ -1374,33 +1401,65 @@ function AdminPanel({onClose}) {
 
         {/* Stats */}
         <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:10,marginBottom:22}}>
-          {[
-            {label:"총 가입자",value:`${users.length}명`},
-            {label:"인증 완료",value:`${users.filter(u=>u.verified).length}명`},
-            {label:"오늘 가입",value:`${users.filter(u=>new Date(u.created_at).toDateString()===new Date().toDateString()).length}명`},
-          ].map(s=>(
-            <div key={s.label} style={{background:T.surface,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`}}>
-              <div style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.coffee,fontWeight:400}}>{s.value}</div>
-              <div style={{fontSize:11,color:T.muted,marginTop:2}}>{s.label}</div>
-            </div>
-          ))}
+          {/* 총 가입자 */}
+          <div onClick={()=>setShowAllUsers(v=>!v)} style={{background:showAllUsers?T.tag:T.surface,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${showAllUsers?T.coffee:T.border}`,cursor:"pointer",transition:"all 0.15s"}}>
+            <div style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.coffee,fontWeight:400}}>{users.length}명</div>
+            <div style={{fontSize:11,color:T.muted,marginTop:2}}>총 가입자</div>
+          </div>
+          {/* 인증 완료 */}
+          <div style={{background:T.surface,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${T.border}`}}>
+            <div style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.coffee,fontWeight:400}}>{users.filter(u=>u.verified).length}명</div>
+            <div style={{fontSize:11,color:T.muted,marginTop:2}}>인증 완료</div>
+          </div>
+          {/* 오늘 가입 */}
+          <div onClick={()=>setShowTodayUsers(v=>!v)} style={{background:showTodayUsers?T.tag:T.surface,borderRadius:10,padding:"14px 16px",textAlign:"center",border:`1px solid ${showTodayUsers?T.coffee:T.border}`,cursor:"pointer",transition:"all 0.15s"}}>
+            <div style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.coffee,fontWeight:400}}>{users.filter(u=>new Date(u.created_at).toDateString()===new Date().toDateString()).length}명</div>
+            <div style={{fontSize:11,color:T.muted,marginTop:2}}>오늘 가입</div>
+          </div>
         </div>
+
+        {/* 총 가입자 리스트 */}
+        {showAllUsers&&(
+          <div style={{marginBottom:14,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
+            {users.map(u=>(
+              <div key={u.id} style={{padding:"9px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                <div>
+                  <span style={{fontSize:13,fontWeight:500,color:T.heading}}>{u.name||"이름없음"}</span>
+                  {u.verified&&<span style={{fontSize:10,color:T.green,background:T.greenBg,borderRadius:20,padding:"1px 6px",marginLeft:6}}>✓ 인증</span>}
+                </div>
+                <span style={{fontSize:11,color:T.muted}}>{u.email}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* 오늘 가입 리스트 */}
+        {showTodayUsers&&(()=>{
+          const todayUsers=users.filter(u=>new Date(u.created_at).toDateString()===new Date().toDateString());
+          return todayUsers.length>0?(
+            <div style={{marginBottom:14,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
+              {todayUsers.map(u=>(
+                <div key={u.id} style={{padding:"9px 14px",borderBottom:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between"}}>
+                  <span style={{fontSize:13,fontWeight:500,color:T.heading}}>{u.name||"이름없음"}</span>
+                  <span style={{fontSize:11,color:T.muted}}>{u.email}</span>
+                </div>
+              ))}
+            </div>
+          ):(<div style={{fontSize:12,color:T.muted,marginBottom:14}}>오늘 가입한 유저가 없어요</div>);
+        })()}
 
         <div style={{height:1,background:T.border,marginBottom:20}}/>
 
-        {/* Bean 지급 */}
+        {/* Bean 지급 — 검색만 */}
         <h3 style={{fontSize:14,fontWeight:600,color:T.heading,marginBottom:14}}>🫘 빈 지급</h3>
-
-        {/* Search */}
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="이름 또는 이메일 검색"
           style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 13px",fontSize:13,color:T.heading,outline:"none",boxSizing:"border-box",marginBottom:10}}
           onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
 
-        {/* User list */}
+        {/* 검색 결과만 표시 */}
+        {search.trim()&&(
         <div style={{maxHeight:180,overflowY:"auto",border:`1px solid ${T.border}`,borderRadius:8,marginBottom:14}}>
-          {loading?(
-            <div style={{padding:"16px",textAlign:"center",color:T.muted,fontSize:13}}>불러오는 중…</div>
-          ):filtered.map(u=>(
+          {filtered.map(u=>(
             <div key={u.id} onClick={()=>setSelectedUser(u)} style={{
               padding:"10px 14px",cursor:"pointer",
               background:selectedUser?.id===u.id?T.tag:"none",
@@ -1419,6 +1478,7 @@ function AdminPanel({onClose}) {
             </div>
           ))}
         </div>
+        )}
 
         {selectedUser&&(
           <div style={{background:T.surface,borderRadius:10,padding:"14px 16px",marginBottom:14,border:`1px solid ${T.border}`}}>
@@ -1439,7 +1499,49 @@ function AdminPanel({onClose}) {
           </div>
         )}
 
-        {/* 불편사항 */}
+        {/* 인증 신청 */}
+        <div style={{height:1,background:T.border,margin:"20px 0"}}/>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+          <h3 style={{fontSize:14,fontWeight:600,color:T.heading}}>🪪 인증 신청 내역</h3>
+          {verifyReqs.length>0&&<span style={{fontSize:12,color:T.red,fontWeight:600}}>{verifyReqs.length}건 대기중</span>}
+        </div>
+        {verifyReqs.length===0?(
+          <div style={{fontSize:12,color:T.muted,marginBottom:14,padding:"10px 14px",background:T.surface,borderRadius:8,border:`1px solid ${T.border}`}}>
+            대기중인 인증 신청이 없어요
+          </div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:8,marginBottom:14}}>
+            {verifyReqs.map((vr,i)=>(
+              <div key={vr.id} style={{background:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                  <div style={{flex:1}}>
+                    <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
+                      <div style={{minWidth:22,height:22,borderRadius:"50%",background:T.tag,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:T.coffee}}>{i+1}</div>
+                      <span style={{fontSize:13,fontWeight:600,color:T.heading}}>{vr.profiles?.name||"이름없음"}</span>
+                      <span style={{fontSize:12,color:T.muted}}>{vr.profiles?.email}</span>
+                    </div>
+                    <div style={{fontSize:12,color:T.muted,marginLeft:28}}>
+                      <div>직장 이메일: {vr.email||"미입력"}</div>
+                      <div>입금 계좌: {vr.bank_account||"미입력"}</div>
+                      <div style={{fontSize:11,marginTop:2}}>{new Date(vr.created_at).toLocaleDateString("ko-KR")}</div>
+                    </div>
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    <button onClick={async()=>{
+                      await supabase.from("profiles").update({verified:true,bank_account:vr.bank_account}).eq("id",vr.user_id);
+                      await supabase.from("verification_requests").update({status:"approved"}).eq("id",vr.id);
+                      setVerifyReqs(vrs=>vrs.filter(v=>v.id!==vr.id));
+                    }} style={{background:T.green,border:"none",borderRadius:7,padding:"6px 12px",color:"#fff",fontSize:12,fontWeight:600,cursor:"pointer"}}>✓ 승인</button>
+                    <button onClick={async()=>{
+                      await supabase.from("verification_requests").update({status:"rejected"}).eq("id",vr.id);
+                      setVerifyReqs(vrs=>vrs.filter(v=>v.id!==vr.id));
+                    }} style={{background:T.tag,border:`1px solid ${T.border}`,borderRadius:7,padding:"6px 12px",color:T.muted,fontSize:12,cursor:"pointer"}}>✕ 거절</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {feedbacks.length>0&&(
           <>
             <div style={{height:1,background:T.border,margin:"20px 0"}}/>
