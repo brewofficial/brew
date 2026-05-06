@@ -44,7 +44,7 @@ input,textarea,button,select{font-family:'Inter',sans-serif}
 
 const FREE_VIEWS     = 5;    // 첫 5회 열람 무료
 const BEANS_PER_VIEW = 1;    // 6번째부터 열람당 1빈
-const BEANS_PER_SEND = 5;    // 커피챗 신청 5빈 = ₩10,000
+const BEANS_PER_SEND = 2;    // 커피챗 신청 2빈 = ₩4,000
 const BEAN_WON       = 2000; // 1빈 = ₩2,000
 const INDUSTRIES = ["전체","IT/테크","금융/투자","컨설팅","마케팅","디자인","MBA/대학원","스타트업","헤드헌터","기타"];
 
@@ -514,7 +514,7 @@ function VerifyOnlyModal({onClose,onComplete}) {
 }
 
 
-function ProfileCard({p,onUnlock,onSend,purchasedBeans,viewCount,index}) {
+function ProfileCard({p,onSend,purchasedBeans,index}) {
   const [open,setOpen]=useState(false);
   const [msg,setMsg]=useState("");
   const [sent,setSent]=useState(false);
@@ -526,55 +526,40 @@ function ProfileCard({p,onUnlock,onSend,purchasedBeans,viewCount,index}) {
         <Avatar initial={p.initial} photo={p.photo}/>
         <div style={{flex:1,minWidth:0}}>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-            <span style={{fontWeight:600,fontSize:15,color:T.heading}}>{p.unlocked?p.name:`${p.name[0]}○○`}</span>
+            <span style={{fontWeight:600,fontSize:15,color:T.heading}}>{p.name}</span>
             {p.verified&&<span style={{fontSize:10,color:T.green,background:T.greenBg,padding:"2px 7px",borderRadius:20,fontWeight:600}}>✓ 인증</span>}
             <span style={{fontSize:11,color:p.available?T.green:T.muted,display:"flex",alignItems:"center",gap:4}}>
               <span style={{width:5,height:5,borderRadius:"50%",background:p.available?T.green:T.muted,display:"inline-block"}}/>
               {p.available?"가능":"중단"}
             </span>
           </div>
-          <p style={{fontSize:12,color:T.muted,marginTop:2}}>{p.role} · {p.unlocked?p.company:"———"} · {p.yoe}년</p>
+          <p style={{fontSize:12,color:T.muted,marginTop:2}}>{p.role} · {p.company} · {p.yoe}년</p>
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{p.skills.map(s=><Tag key={s} label={s}/>)}</div>
+      <p style={{fontSize:13,color:T.body,lineHeight:1.65,marginBottom:14}}>{p.bio}</p>
       <div style={{height:1,background:T.border,marginBottom:14}}/>
-      {p.unlocked?(
-        <>
-          <p style={{fontSize:13,color:T.body,lineHeight:1.65,marginBottom:14}}>{p.bio}</p>
-          {!sent?(open?(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <textarea value={msg} onChange={e=>setMsg(e.target.value)} placeholder="간단한 소개와 커피챗 목적을 적어주세요" rows={3}
-                style={{border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px",fontSize:13,resize:"none",outline:"none",color:T.heading,lineHeight:1.6}}
-                onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
-              {/* Cost + reply notice */}
-              <div style={{background:T.surface,borderRadius:7,padding:"10px 12px",fontSize:12,color:T.muted,lineHeight:1.6}}>
-                🫘 신청 시 <strong style={{color:T.coffee}}>5빈 (₩10,000)</strong> 차감 · 답장은 보장되지 않아요.
-                {p.verified&&<span style={{color:T.green,marginLeft:4}}>✓ 인증 회원은 답장 확률이 높아요.</span>}
-              </div>
-              <div style={{display:"flex",gap:7}}>
-                <button onClick={async()=>{const ok=await onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 5빈</button>
-                <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
-              </div>
-            </div>
-          ):(
-            <button onClick={()=>setOpen(true)} style={{width:"100%",background:"none",border:`1px solid ${T.coffee}`,borderRadius:7,padding:"9px",color:T.coffee,fontWeight:600,fontSize:13,cursor:"pointer",transition:"background 0.15s"}}
-              onMouseEnter={e=>e.target.style.background=T.tag} onMouseLeave={e=>e.target.style.background="none"}>☕ 커피챗 신청하기</button>
-          )):(
-            <div style={{textAlign:"center",padding:"9px",background:T.tag,borderRadius:7,fontSize:13,color:T.tagText}}>신청 완료 — 답변을 기다리는 중이에요</div>
-          )}
-        </>
-      ):(
-        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
-          {viewCount < FREE_VIEWS
-            ? <span style={{fontSize:12,color:T.muted}}>무료 열람 {FREE_VIEWS - viewCount}회 남음</span>
-            : <span style={{fontSize:12,color:T.muted}}>열람 · 1빈 소요</span>
-          }
-          <button onClick={()=>onUnlock(p.id)}
-            disabled={viewCount >= FREE_VIEWS && purchasedBeans < BEANS_PER_VIEW}
-            style={{background:viewCount<FREE_VIEWS?T.coffee:(purchasedBeans>=BEANS_PER_VIEW?T.coffee:T.tag),border:"none",borderRadius:7,padding:"8px 16px",color:viewCount<FREE_VIEWS?"#fff":(purchasedBeans>=BEANS_PER_VIEW?"#fff":T.muted),fontSize:12,fontWeight:600,cursor:(viewCount>=FREE_VIEWS&&purchasedBeans<BEANS_PER_VIEW)?"not-allowed":"pointer"}}>
-            {viewCount < FREE_VIEWS ? "무료 열람" : purchasedBeans >= BEANS_PER_VIEW ? "열람 · 1빈" : "빈 부족"}
-          </button>
+      {!sent?(open?(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <textarea value={msg} onChange={e=>setMsg(e.target.value)} placeholder="간단한 소개와 커피챗 목적을 적어주세요" rows={3}
+            style={{border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px",fontSize:13,resize:"none",outline:"none",color:T.heading,lineHeight:1.6}}
+            onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+          <div style={{background:T.surface,borderRadius:7,padding:"10px 12px",fontSize:12,color:T.muted,lineHeight:1.6}}>
+            🫘 신청 시 <strong style={{color:T.coffee}}>2빈 (₩4,000)</strong> 차감 · 답장은 보장되지 않아요.
+            {p.verified&&<span style={{color:T.green,marginLeft:4}}>✓ 인증 회원은 답장 확률이 높아요.</span>}
+          </div>
+          <div style={{display:"flex",gap:7}}>
+            <button onClick={async()=>{const ok=await onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 2빈</button>
+            <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
+          </div>
         </div>
+      ):(
+        <button onClick={()=>p.available?setOpen(true):null} disabled={!p.available} style={{width:"100%",background:p.available?"none":T.surface,border:`1px solid ${p.available?T.coffee:T.border}`,borderRadius:7,padding:"9px",color:p.available?T.coffee:T.muted,fontWeight:600,fontSize:13,cursor:p.available?"pointer":"not-allowed",transition:"background 0.15s"}}
+          onMouseEnter={e=>{if(p.available)e.target.style.background=T.tag;}} onMouseLeave={e=>{if(p.available)e.target.style.background="none";}}>
+          {p.available?"☕ 커피챗 신청하기":"현재 신청 불가"}
+        </button>
+      )):(
+        <div style={{textAlign:"center",padding:"9px",background:T.tag,borderRadius:7,fontSize:13,color:T.tagText}}>신청 완료 — 답변을 기다리는 중이에요</div>
       )}
     </div>
   );
@@ -2008,7 +1993,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onUnlock={handleUnlock} onSend={handleSend} purchasedBeans={purchasedBeans} viewCount={viewCount} index={i}/>)}
+              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onSend={()=>handleSend()} purchasedBeans={purchasedBeans} index={i}/>)}
             </div>
           </>
         )}
