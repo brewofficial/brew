@@ -1169,7 +1169,7 @@ function RefundPolicyModal({onClose}) {
             <p style={{marginTop:4}}>
               결제 후 사용하지 않은 구매빈은 결제일로부터 7일 이내 환불 가능합니다.
               단, 커피챗 신청, 레주메 리뷰 신청, Q&A 질문 등록 등으로 이미 사용된 구매빈은 환불되지 않습니다.
-              환불 시 결제대행 수수료 등 실비 보전을 위해 환불 금액의 5%가 위약금으로 차감된 후 지급됩니다.
+              환불 시 결제대행 수수료 등 실비 보전을 위해 환불 금액의 10%가 환불 수수료로 차감된 후 지급됩니다.
             </p>
           </div>
           <div>
@@ -1242,7 +1242,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
     if(data) setRefundableCharges(data);
   }
 
-  const REFUND_FEE_RATE = 0.05; // 환불 위약금 5%
+  const REFUND_FEE_RATE = 0.10; // 환불 수수료 10%
 
   async function handleRefundRequest(charge){
     setRefundLoading(true);
@@ -1255,8 +1255,8 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
 
       // 환불 가능한 빈 수 = min(현재 보유 구매빈, 패키지 전체 빈)
       const refundableBeans = Math.min(purchasedBeans, totalBeansInPkg);
-      const grossRefundAmount = Math.round(refundableBeans * unitPrice); // 위약금 적용 전 금액
-      const refundFee = Math.round(grossRefundAmount * REFUND_FEE_RATE); // 환불 위약금 5%
+      const grossRefundAmount = Math.round(refundableBeans * unitPrice); // 환불 수수료 적용 전 금액
+      const refundFee = Math.round(grossRefundAmount * REFUND_FEE_RATE); // 환불 수수료 10%
       const refundAmount = grossRefundAmount - refundFee; // 실제 환불액
 
       if(refundableBeans <= 0){
@@ -1267,7 +1267,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
 
       const isFullRefund = refundableBeans === totalBeansInPkg;
 
-      // 전액이든 부분이든 위약금 5% 차감 후 cancelAmount로 정확히 취소
+      // 전액이든 부분이든 환불 수수료 10% 차감 후 cancelAmount로 정확히 취소
       const res = await fetch("https://api.tosspayments.com/v1/payments/"+charge.payment_key+"/cancel",{
         method:"POST",
         headers:{
@@ -1275,8 +1275,8 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
           "Content-Type":"application/json",
         },
         body: JSON.stringify({
-          cancelReason: isFullRefund ? "고객 요청 - 미사용 구매빈 전액 환불 (위약금 5% 차감)" : "고객 요청 - 미사용 구매빈 부분 환불 (위약금 5% 차감)",
-          cancelAmount: refundAmount, // 위약금 5% 차감된 실제 취소 금액
+          cancelReason: isFullRefund ? "고객 요청 - 미사용 구매빈 전액 환불 (환불 수수료 10% 차감)" : "고객 요청 - 미사용 구매빈 부분 환불 (환불 수수료 10% 차감)",
+          cancelAmount: refundAmount, // 환불 수수료 10% 차감된 실제 취소 금액
         }),
       });
       if(!res.ok) throw new Error("결제취소 실패");
@@ -1284,7 +1284,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
       await supabase.from("profiles").update({purchased_beans:purchasedBeans-refundableBeans}).eq("id",user.id);
       await supabase.from("bean_transactions").insert({
         user_id:user.id, type:"refund_completed", amount:-refundableBeans,
-        description:`${charge.description} 중 미사용 ${refundableBeans}빈 환불 — 환불금 ₩${grossRefundAmount.toLocaleString()}에서 위약금 5%(₩${refundFee.toLocaleString()}) 차감, 실환불 ₩${refundAmount.toLocaleString()} (단가 ₩${unitPrice.toLocaleString()}/빈)`,
+        description:`${charge.description} 중 미사용 ${refundableBeans}빈 환불 — 환불금 ₩${grossRefundAmount.toLocaleString()}에서 환불 수수료 10%(₩${refundFee.toLocaleString()}) 차감, 실환불 ₩${refundAmount.toLocaleString()} (단가 ₩${unitPrice.toLocaleString()}/빈)`,
         refund_status:"completed", order_id:charge.order_id,
       });
       setRefundDone({type:"auto", amount:refundableBeans, price:refundAmount, gross:grossRefundAmount, fee:refundFee});
@@ -1540,7 +1540,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                         <span>환불 대상 금액</span><span>₩{refundDone.gross?.toLocaleString()}</span>
                       </div>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.red,marginBottom:4}}>
-                        <span>환불 위약금 (5%)</span><span>-₩{refundDone.fee?.toLocaleString()}</span>
+                        <span>환불 수수료 (10%)</span><span>-₩{refundDone.fee?.toLocaleString()}</span>
                       </div>
                       <div style={{height:1,background:T.border,margin:"6px 0"}}/>
                       <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700,color:T.heading}}>
@@ -1564,7 +1564,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
             ):(
               <>
                 <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:4}}>미사용 구매빈 환불</h3>
-                <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>결제일로부터 7일 이내 미사용 구매빈은 환불 가능해요.<br/>환불 시 결제 금액의 <strong style={{color:T.red}}>5% 위약금</strong>이 차감돼요.</p>
+                <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>결제일로부터 7일 이내 미사용 구매빈은 환불 가능해요.<br/>환불 시 결제 금액의 <strong style={{color:T.red}}>10% 환불 수수료</strong>가 차감돼요.</p>
                 {refundableCharges.length===0?(
                   <div style={{background:T.surface,borderRadius:8,padding:"16px",textAlign:"center",fontSize:13,color:T.muted}}>
                     환불 가능한 충전 내역이 없어요.<br/>(7일이 지났거나 결제 정보를 찾을 수 없어요)
