@@ -1149,7 +1149,7 @@ function BusinessFooter({onShowRefund}) {
         <div style={{fontSize:11,color:T.muted,lineHeight:1.8}}>
           <div>상호명: {BIZ_INFO.name} &nbsp;|&nbsp; 대표자명: {BIZ_INFO.ceo} &nbsp;|&nbsp; 사업자등록번호: {BIZ_INFO.bizNumber}</div>
           <div>통신판매업신고번호: {BIZ_INFO.mailOrderNumber} &nbsp;|&nbsp; 사업장 주소: {BIZ_INFO.address}</div>
-          <div>고객센터: {BIZ_INFO.phone} &nbsp;|&nbsp; 이메일: {BIZ_INFO.email}</div>
+          <div>사업장 연락처: {BIZ_INFO.phone}</div>
         </div>
         <div style={{fontSize:10,color:T.muted,marginTop:12}}>© 2026 브루(BREW). All rights reserved.</div>
       </div>
@@ -1195,7 +1195,7 @@ function RefundPolicyModal({onClose}) {
           <div>
             <strong style={{color:T.heading}}>제5조 (환불 신청 방법)</strong>
             <p style={{marginTop:4}}>
-              마이페이지 내 '불편사항 접수' 또는 이메일(jsteviap@gmail.com)로 신청해 주시면 영업일 기준 3일 이내 처리해 드립니다.
+              마이페이지 내 '불편사항 접수'를 통해 환불을 신청해 주시면 영업일 기준 3일 이내 처리해 드립니다.
             </p>
           </div>
         </div>
