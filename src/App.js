@@ -1209,6 +1209,10 @@ function RefundPolicyModal({onClose}) {
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
   const [tab,setTab]=useState("beans");
   const [verifyNotifs,setVerifyNotifs]=useState([]);
+  const [refundOpen,setRefundOpen]=useState(false);
+  const [refundableCharges,setRefundableCharges]=useState([]);
+  const [refundDone,setRefundDone]=useState(null); // {type:"auto"|"review", amount}
+  const [refundLoading,setRefundLoading]=useState(false);
 
   useEffect(()=>{
     async function loadNotifs(){
@@ -1222,6 +1226,62 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
     }
     loadNotifs();
   },[user?.id]);
+
+  // 환불 가능한 충전 내역 불러오기 (7일 이내, 결제 정보 있는 것)
+  async function loadRefundableCharges(){
+    if(!user?.id) return;
+    const sevenDaysAgo = new Date(Date.now()-7*24*60*60*1000).toISOString();
+    const {data}=await supabase.from("bean_transactions")
+      .select("*")
+      .eq("user_id",user.id)
+      .eq("type","charge")
+      .gte("created_at",sevenDaysAgo)
+      .not("payment_key","is",null)
+      .order("created_at",{ascending:false});
+    if(data) setRefundableCharges(data);
+  }
+
+  async function handleRefundRequest(charge){
+    setRefundLoading(true);
+    try {
+      // 현재 구매빈이 환불요청 빈 수보다 충분한지 확인 (미사용 여부 근사 체크)
+      if(purchasedBeans < charge.amount){
+        // 일부만 사용됨 — 자동 처리 불가, 관리자 검토로 전환
+        await supabase.from("bean_transactions").insert({
+          user_id:user.id, type:"refund_request", amount:charge.amount,
+          description:`[환불검토] ${charge.description} 중 일부 사용으로 자동환불 불가`,
+          refund_status:"pending", order_id:charge.order_id, payment_key:charge.payment_key,
+        });
+        setRefundDone({type:"review", amount:charge.amount});
+      } else {
+        // 토스 결제취소 API 호출
+        const res = await fetch("https://api.tosspayments.com/v1/payments/"+charge.payment_key+"/cancel",{
+          method:"POST",
+          headers:{
+            "Authorization":`Basic ${btoa(process.env.REACT_APP_TOSS_SECRET_KEY+":")}`,
+            "Content-Type":"application/json",
+          },
+          body: JSON.stringify({cancelReason:"고객 요청 - 미사용 구매빈 환불"}),
+        });
+        if(!res.ok) throw new Error("결제취소 실패");
+
+        // 구매빈 차감 + 거래내역 기록
+        await supabase.from("profiles").update({purchased_beans:purchasedBeans-charge.amount}).eq("id",user.id);
+        await supabase.from("bean_transactions").insert({
+          user_id:user.id, type:"refund_completed", amount:-charge.amount,
+          description:`${charge.description} 환불 완료`,
+          refund_status:"completed", order_id:charge.order_id,
+        });
+        setRefundDone({type:"auto", amount:charge.amount});
+      }
+      setRefundableCharges(rc=>rc.filter(c=>c.id!==charge.id));
+    } catch(e){
+      console.error(e);
+      setRefundDone({type:"error"});
+    }
+    setRefundLoading(false);
+  }
+
   const [feedbackOpen,setFeedbackOpen]=useState(false);
   const [feedbackText,setFeedbackText]=useState("");
   const [feedbackSent,setFeedbackSent]=useState(false);
@@ -1376,6 +1436,13 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                   </div>
                 </div>
               </div>
+
+              {/* 미사용 구매빈 환불 안내 — 작은 링크 */}
+              <div style={{textAlign:"center",marginTop:6}}>
+                <span onClick={async()=>{await loadRefundableCharges();setRefundOpen(true);setRefundDone(null);}} style={{fontSize:11,color:T.muted,textDecoration:"underline",cursor:"pointer"}}>
+                  미사용 구매빈 환불 안내
+                </span>
+              </div>
             </div>
           )}
 
@@ -1443,6 +1510,65 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
           )}
         </div>
       </div>
+
+      {/* 미사용 구매빈 환불 모달 */}
+      {refundOpen&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.6)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:3000,padding:20}} onClick={()=>setRefundOpen(false)}>
+          <div style={{background:T.bg,borderRadius:14,padding:"28px",maxWidth:420,width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 16px 48px rgba(28,20,16,0.2)"}} onClick={e=>e.stopPropagation()}>
+            {refundDone?(
+              <div style={{textAlign:"center",padding:"16px 0"}}>
+                {refundDone.type==="auto"&&(
+                  <>
+                    <div style={{fontSize:40,marginBottom:12}}>✅</div>
+                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>환불 완료</h3>
+                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>{refundDone.amount}빈에 해당하는 결제가 취소됐어요.<br/>영업일 기준 3~5일 내 카드사로 환불됩니다.</p>
+                  </>
+                )}
+                {refundDone.type==="review"&&(
+                  <>
+                    <div style={{fontSize:40,marginBottom:12}}>📋</div>
+                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>검토 신청 완료</h3>
+                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>일부 사용된 패키지라 자동 환불이 어려워요.<br/>영업일 기준 3일 이내 검토 후 안내드릴게요.</p>
+                  </>
+                )}
+                {refundDone.type==="error"&&(
+                  <>
+                    <div style={{fontSize:40,marginBottom:12}}>⚠️</div>
+                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>오류가 발생했어요</h3>
+                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>잠시 후 다시 시도해 주세요.</p>
+                  </>
+                )}
+                <button onClick={()=>setRefundOpen(false)} style={{marginTop:20,background:T.coffee,border:"none",borderRadius:8,padding:"10px 28px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>확인</button>
+              </div>
+            ):(
+              <>
+                <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:4}}>미사용 구매빈 환불</h3>
+                <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>결제일로부터 7일 이내 미사용 구매빈은 환불 가능해요.</p>
+                {refundableCharges.length===0?(
+                  <div style={{background:T.surface,borderRadius:8,padding:"16px",textAlign:"center",fontSize:13,color:T.muted}}>
+                    환불 가능한 충전 내역이 없어요.<br/>(7일이 지났거나 결제 정보를 찾을 수 없어요)
+                  </div>
+                ):(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {refundableCharges.map(c=>(
+                      <div key={c.id} style={{background:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{c.description}</div>
+                          <div style={{fontSize:11,color:T.muted,marginTop:2}}>{new Date(c.created_at).toLocaleDateString("ko-KR")}</div>
+                        </div>
+                        <button onClick={()=>handleRefundRequest(c)} disabled={refundLoading} style={{background:T.coffee,border:"none",borderRadius:7,padding:"7px 14px",color:"#fff",fontSize:12,fontWeight:600,cursor:refundLoading?"not-allowed":"pointer",flexShrink:0,opacity:refundLoading?0.6:1}}>
+                          {refundLoading?"처리 중…":"환불 신청"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <button onClick={()=>setRefundOpen(false)} style={{width:"100%",marginTop:16,background:"none",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px",color:T.muted,fontSize:13,cursor:"pointer"}}>닫기</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

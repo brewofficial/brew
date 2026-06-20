@@ -41,6 +41,8 @@ export function PaymentSuccess() {
             type: "charge",
             amount: beans,
             description: `${label} 충전 (₩${amount.toLocaleString()})`,
+            payment_key: paymentKey,
+            order_id: orderId,
           });
         }
         setStatus("success");
