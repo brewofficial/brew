@@ -66,10 +66,10 @@ const INIT_QA = [
 ];
 
 const BEAN_PKGS = [
-  {id:1,beans:5,  price:10000,label:"Starter", desc:"커피챗 신청 1회",  popular:false},
-  {id:2,beans:10, price:18000,label:"Basic",   desc:"커피챗 신청 2회", popular:false},
-  {id:3,beans:25, price:40000,label:"Standard",desc:"커피챗 신청 5회", popular:true},
-  {id:4,beans:50, price:70000,label:"Pro",     desc:"커피챗 신청 10회",popular:false},
+  {id:1,beans:5,  price:10000,label:"Starter", desc:"기본가",     popular:false},
+  {id:2,beans:10, price:18000,label:"Basic",   desc:"10% 할인",  popular:false},
+  {id:3,beans:25, price:40000,label:"Standard",desc:"20% 할인",  popular:true},
+  {id:4,beans:50, price:70000,label:"Pro",     desc:"30% 할인",  popular:false},
 ];
 
 /* ── Mock Data ──────────────────────────────── */
@@ -1167,8 +1167,9 @@ function RefundPolicyModal({onClose}) {
           <div>
             <strong style={{color:T.heading}}>제1조 (구매빈 환불)</strong>
             <p style={{marginTop:4}}>
-              결제 후 사용하지 않은 구매빈은 결제일로부터 7일 이내 전액 환불 가능합니다.
+              결제 후 사용하지 않은 구매빈은 결제일로부터 7일 이내 환불 가능합니다.
               단, 커피챗 신청, 레주메 리뷰 신청, Q&A 질문 등록 등으로 이미 사용된 구매빈은 환불되지 않습니다.
+              환불 시 결제대행 수수료 등 실비 보전을 위해 환불 금액의 5%가 위약금으로 차감된 후 지급됩니다.
             </p>
           </div>
           <div>
@@ -1241,39 +1242,52 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
     if(data) setRefundableCharges(data);
   }
 
+  const REFUND_FEE_RATE = 0.05; // 환불 위약금 5%
+
   async function handleRefundRequest(charge){
     setRefundLoading(true);
     try {
-      // 현재 구매빈이 환불요청 빈 수보다 충분한지 확인 (미사용 여부 근사 체크)
-      if(purchasedBeans < charge.amount){
-        // 일부만 사용됨 — 자동 처리 불가, 관리자 검토로 전환
-        await supabase.from("bean_transactions").insert({
-          user_id:user.id, type:"refund_request", amount:charge.amount,
-          description:`[환불검토] ${charge.description} 중 일부 사용으로 자동환불 불가`,
-          refund_status:"pending", order_id:charge.order_id, payment_key:charge.payment_key,
-        });
-        setRefundDone({type:"review", amount:charge.amount});
-      } else {
-        // 토스 결제취소 API 호출
-        const res = await fetch("https://api.tosspayments.com/v1/payments/"+charge.payment_key+"/cancel",{
-          method:"POST",
-          headers:{
-            "Authorization":`Basic ${btoa(process.env.REACT_APP_TOSS_SECRET_KEY+":")}`,
-            "Content-Type":"application/json",
-          },
-          body: JSON.stringify({cancelReason:"고객 요청 - 미사용 구매빈 환불"}),
-        });
-        if(!res.ok) throw new Error("결제취소 실패");
+      // 결제 description에서 패키지 매칭 (예: "Standard 충전 (₩40,000)")
+      const matchedPkg = BEAN_PKGS.find(p => charge.description?.includes(p.label));
+      const totalBeansInPkg = matchedPkg ? matchedPkg.beans : charge.amount;
+      const totalPriceOfPkg = matchedPkg ? matchedPkg.price : charge.amount * 2000;
+      const unitPrice = totalPriceOfPkg / totalBeansInPkg; // 해당 패키지의 정확한 빈당 단가
 
-        // 구매빈 차감 + 거래내역 기록
-        await supabase.from("profiles").update({purchased_beans:purchasedBeans-charge.amount}).eq("id",user.id);
-        await supabase.from("bean_transactions").insert({
-          user_id:user.id, type:"refund_completed", amount:-charge.amount,
-          description:`${charge.description} 환불 완료`,
-          refund_status:"completed", order_id:charge.order_id,
-        });
-        setRefundDone({type:"auto", amount:charge.amount});
+      // 환불 가능한 빈 수 = min(현재 보유 구매빈, 패키지 전체 빈)
+      const refundableBeans = Math.min(purchasedBeans, totalBeansInPkg);
+      const grossRefundAmount = Math.round(refundableBeans * unitPrice); // 위약금 적용 전 금액
+      const refundFee = Math.round(grossRefundAmount * REFUND_FEE_RATE); // 환불 위약금 5%
+      const refundAmount = grossRefundAmount - refundFee; // 실제 환불액
+
+      if(refundableBeans <= 0){
+        setRefundDone({type:"error"});
+        setRefundLoading(false);
+        return;
       }
+
+      const isFullRefund = refundableBeans === totalBeansInPkg;
+
+      // 전액이든 부분이든 위약금 5% 차감 후 cancelAmount로 정확히 취소
+      const res = await fetch("https://api.tosspayments.com/v1/payments/"+charge.payment_key+"/cancel",{
+        method:"POST",
+        headers:{
+          "Authorization":`Basic ${btoa(process.env.REACT_APP_TOSS_SECRET_KEY+":")}`,
+          "Content-Type":"application/json",
+        },
+        body: JSON.stringify({
+          cancelReason: isFullRefund ? "고객 요청 - 미사용 구매빈 전액 환불 (위약금 5% 차감)" : "고객 요청 - 미사용 구매빈 부분 환불 (위약금 5% 차감)",
+          cancelAmount: refundAmount, // 위약금 5% 차감된 실제 취소 금액
+        }),
+      });
+      if(!res.ok) throw new Error("결제취소 실패");
+
+      await supabase.from("profiles").update({purchased_beans:purchasedBeans-refundableBeans}).eq("id",user.id);
+      await supabase.from("bean_transactions").insert({
+        user_id:user.id, type:"refund_completed", amount:-refundableBeans,
+        description:`${charge.description} 중 미사용 ${refundableBeans}빈 환불 — 환불금 ₩${grossRefundAmount.toLocaleString()}에서 위약금 5%(₩${refundFee.toLocaleString()}) 차감, 실환불 ₩${refundAmount.toLocaleString()} (단가 ₩${unitPrice.toLocaleString()}/빈)`,
+        refund_status:"completed", order_id:charge.order_id,
+      });
+      setRefundDone({type:"auto", amount:refundableBeans, price:refundAmount, gross:grossRefundAmount, fee:refundFee});
       setRefundableCharges(rc=>rc.filter(c=>c.id!==charge.id));
     } catch(e){
       console.error(e);
@@ -1521,14 +1535,21 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                   <>
                     <div style={{fontSize:40,marginBottom:12}}>✅</div>
                     <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>환불 완료</h3>
-                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>{refundDone.amount}빈에 해당하는 결제가 취소됐어요.<br/>영업일 기준 3~5일 내 카드사로 환불됩니다.</p>
-                  </>
-                )}
-                {refundDone.type==="review"&&(
-                  <>
-                    <div style={{fontSize:40,marginBottom:12}}>📋</div>
-                    <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:8}}>검토 신청 완료</h3>
-                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>일부 사용된 패키지라 자동 환불이 어려워요.<br/>영업일 기준 3일 이내 검토 후 안내드릴게요.</p>
+                    <div style={{background:T.surface,borderRadius:8,padding:"12px 16px",margin:"0 0 14px",textAlign:"left"}}>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.muted,marginBottom:4}}>
+                        <span>환불 대상 금액</span><span>₩{refundDone.gross?.toLocaleString()}</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.red,marginBottom:4}}>
+                        <span>환불 위약금 (5%)</span><span>-₩{refundDone.fee?.toLocaleString()}</span>
+                      </div>
+                      <div style={{height:1,background:T.border,margin:"6px 0"}}/>
+                      <div style={{display:"flex",justifyContent:"space-between",fontSize:13,fontWeight:700,color:T.heading}}>
+                        <span>실 환불 금액</span><span>₩{refundDone.price?.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <p style={{fontSize:13,color:T.muted,lineHeight:1.7}}>
+                      {refundDone.amount}빈에 해당하는 결제가 취소됐어요.<br/>영업일 기준 3~5일 내 카드사로 환불됩니다.
+                    </p>
                   </>
                 )}
                 {refundDone.type==="error"&&(
@@ -1543,24 +1564,34 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
             ):(
               <>
                 <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:4}}>미사용 구매빈 환불</h3>
-                <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>결제일로부터 7일 이내 미사용 구매빈은 환불 가능해요.</p>
+                <p style={{fontSize:12,color:T.muted,marginBottom:16,lineHeight:1.6}}>결제일로부터 7일 이내 미사용 구매빈은 환불 가능해요.<br/>환불 시 결제 금액의 <strong style={{color:T.red}}>5% 위약금</strong>이 차감돼요.</p>
                 {refundableCharges.length===0?(
                   <div style={{background:T.surface,borderRadius:8,padding:"16px",textAlign:"center",fontSize:13,color:T.muted}}>
                     환불 가능한 충전 내역이 없어요.<br/>(7일이 지났거나 결제 정보를 찾을 수 없어요)
                   </div>
                 ):(
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                    {refundableCharges.map(c=>(
-                      <div key={c.id} style={{background:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
-                        <div>
-                          <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{c.description}</div>
-                          <div style={{fontSize:11,color:T.muted,marginTop:2}}>{new Date(c.created_at).toLocaleDateString("ko-KR")}</div>
+                    {refundableCharges.map(c=>{
+                      const matchedPkg = BEAN_PKGS.find(p => c.description?.includes(p.label));
+                      const totalBeansInPkg = matchedPkg ? matchedPkg.beans : c.amount;
+                      const unitPrice = matchedPkg ? matchedPkg.price/matchedPkg.beans : 2000;
+                      const refundableBeans = Math.min(purchasedBeans, totalBeansInPkg);
+                      const estimatedAmount = Math.round(refundableBeans * unitPrice);
+                      return (
+                        <div key={c.id} style={{background:T.surface,borderRadius:8,padding:"12px 14px",border:`1px solid ${T.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",gap:10}}>
+                          <div>
+                            <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{c.description}</div>
+                            <div style={{fontSize:11,color:T.muted,marginTop:2}}>{new Date(c.created_at).toLocaleDateString("ko-KR")}</div>
+                            <div style={{fontSize:11,color:T.coffee,marginTop:3,fontWeight:600}}>
+                              예상 환불: {refundableBeans}빈 (₩{estimatedAmount.toLocaleString()})
+                            </div>
+                          </div>
+                          <button onClick={()=>handleRefundRequest(c)} disabled={refundLoading||refundableBeans<=0} style={{background:T.coffee,border:"none",borderRadius:7,padding:"7px 14px",color:"#fff",fontSize:12,fontWeight:600,cursor:refundLoading?"not-allowed":"pointer",flexShrink:0,opacity:refundLoading?0.6:1}}>
+                            {refundLoading?"처리 중…":"환불 신청"}
+                          </button>
                         </div>
-                        <button onClick={()=>handleRefundRequest(c)} disabled={refundLoading} style={{background:T.coffee,border:"none",borderRadius:7,padding:"7px 14px",color:"#fff",fontSize:12,fontWeight:600,cursor:refundLoading?"not-allowed":"pointer",flexShrink:0,opacity:refundLoading?0.6:1}}>
-                          {refundLoading?"처리 중…":"환불 신청"}
-                        </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
                 <button onClick={()=>setRefundOpen(false)} style={{width:"100%",marginTop:16,background:"none",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px",color:T.muted,fontSize:13,cursor:"pointer"}}>닫기</button>
