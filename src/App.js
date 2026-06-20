@@ -43,6 +43,16 @@ input,textarea,button,select{font-family:'Inter',sans-serif}
 `;
 
 const FREE_VIEWS     = 5;    // 첫 5회 열람 무료
+
+const BIZ_INFO = {
+  name: "브루(BREW)",
+  ceo: "박정민",
+  bizNumber: "248-37-01515",
+  mailOrderNumber: "2026-서울마포-1252",
+  address: "서울특별시 마포구 마포대로 67(도화동, 에비뉴67)",
+  phone: "010-5957-6114",
+  email: "jsteviap@gmail.com",
+};
 const BEANS_PER_VIEW = 1;    // 6번째부터 열람당 1빈
 const BEANS_PER_SEND = 2;    // 커피챗 신청 2빈 = ₩4,000
 const BEAN_WON       = 2000; // 1빈 = ₩2,000
@@ -1124,7 +1134,78 @@ function sendNotification(title, body) {
   }
 }
 
-/* ── My Page ─────────────────────────────────── */
+/* ── Business Info Footer ───────────────────── */
+function BusinessFooter({onShowRefund}) {
+  return (
+    <footer style={{borderTop:`1px solid ${T.border}`,background:T.surface,padding:"28px 24px",marginTop:40}}>
+      <div style={{maxWidth:960,margin:"0 auto"}}>
+        <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14,flexWrap:"wrap"}}>
+          <span onClick={onShowRefund} style={{fontSize:12,color:T.body,cursor:"pointer",textDecoration:"underline"}}>환불정책</span>
+          <span style={{color:T.border}}>|</span>
+          <span style={{fontSize:12,color:T.body}}>이용약관</span>
+          <span style={{color:T.border}}>|</span>
+          <span style={{fontSize:12,color:T.body}}>개인정보처리방침</span>
+        </div>
+        <div style={{fontSize:11,color:T.muted,lineHeight:1.8}}>
+          <div>상호명: {BIZ_INFO.name} &nbsp;|&nbsp; 대표자명: {BIZ_INFO.ceo} &nbsp;|&nbsp; 사업자등록번호: {BIZ_INFO.bizNumber}</div>
+          <div>통신판매업신고번호: {BIZ_INFO.mailOrderNumber} &nbsp;|&nbsp; 사업장 주소: {BIZ_INFO.address}</div>
+          <div>고객센터: {BIZ_INFO.phone} &nbsp;|&nbsp; 이메일: {BIZ_INFO.email}</div>
+        </div>
+        <div style={{fontSize:10,color:T.muted,marginTop:12}}>© 2026 브루(BREW). All rights reserved.</div>
+      </div>
+    </footer>
+  );
+}
+
+/* ── Refund Policy Modal ─────────────────────── */
+function RefundPolicyModal({onClose}) {
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.5)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
+      <div style={{background:T.bg,borderRadius:14,padding:"28px",maxWidth:540,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 16px 48px rgba(28,20,16,0.2)"}} onClick={e=>e.stopPropagation()}>
+        <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:20,color:T.heading,fontWeight:400,marginBottom:16}}>환불정책</h2>
+        <div style={{fontSize:13,color:T.body,lineHeight:1.8,display:"flex",flexDirection:"column",gap:14}}>
+          <div>
+            <strong style={{color:T.heading}}>제1조 (구매빈 환불)</strong>
+            <p style={{marginTop:4}}>
+              결제 후 사용하지 않은 구매빈은 결제일로부터 7일 이내 전액 환불 가능합니다.
+              단, 커피챗 신청, 레주메 리뷰 신청, Q&A 질문 등록 등으로 이미 사용된 구매빈은 환불되지 않습니다.
+            </p>
+          </div>
+          <div>
+            <strong style={{color:T.heading}}>제2조 (서비스 미제공 시 환불)</strong>
+            <p style={{marginTop:4}}>
+              커피챗 신청 후 7일 이내 상대방의 응답이 없을 경우, 사용된 구매빈을 전액 환불해 드립니다.
+              레주메 리뷰의 경우 리뷰어의 검토 기한(턴어라운드 타임)이 지나도 피드백이 도착하지 않으면 환불 요청이 가능합니다.
+            </p>
+          </div>
+          <div>
+            <strong style={{color:T.heading}}>제3조 (Q&A 현상금 환불)</strong>
+            <p style={{marginTop:4}}>
+              등록한 질문에 답변이 하나도 달리지 않은 경우, 예치된 빈을 전액 환불 받을 수 있습니다.
+              단, 답변이 1개 이상 등록된 이후에는 환불이 불가하며 베스트 답변을 채택해야 합니다.
+            </p>
+          </div>
+          <div>
+            <strong style={{color:T.heading}}>제4조 (수익빈)</strong>
+            <p style={{marginTop:4}}>
+              레주메 리뷰, Q&A 채택 등을 통해 적립된 수익빈은 현금 환불 대상이 아니며, 등록된 계좌로의 출금만 가능합니다.
+              출금 신청 후 영업일 기준 1~2일 이내 입금됩니다.
+            </p>
+          </div>
+          <div>
+            <strong style={{color:T.heading}}>제5조 (환불 신청 방법)</strong>
+            <p style={{marginTop:4}}>
+              마이페이지 내 '불편사항 접수' 또는 이메일(jsteviap@gmail.com)로 신청해 주시면 영업일 기준 3일 이내 처리해 드립니다.
+            </p>
+          </div>
+        </div>
+        <button onClick={onClose} style={{width:"100%",marginTop:20,background:T.coffee,border:"none",borderRadius:8,padding:"11px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>확인</button>
+      </div>
+    </div>
+  );
+}
+
+
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
   const [tab,setTab]=useState("beans");
   const [verifyNotifs,setVerifyNotifs]=useState([]);
@@ -1737,6 +1818,7 @@ function MainApp({user}) {
   const [verifyModal,setVerifyModal]=useState(false);
   const [adminModal,setAdminModal]=useState(false);
   const [myPageModal,setMyPageModal]=useState(false);
+  const [refundModal,setRefundModal]=useState(false);
 
   const [filter,setFilter]=useState("전체");
   const [viewCount,setViewCount]=useState(0);
@@ -2048,6 +2130,8 @@ function MainApp({user}) {
 
       </main>
 
+      <BusinessFooter onShowRefund={()=>setRefundModal(true)}/>
+
       {beanModal    &&<BeanModal onClose={()=>setBeanModal(false)} onBuy={handleBuy} user={user}/>}
       {withdrawModal&&<WithdrawModal earnedBeans={earnedBeans} bankAccount={bankAccount} onClose={()=>setWithdrawModal(false)} onWithdraw={handleWithdraw}/>}
       {revRegModal  &&<RegisterReviewerModal onClose={()=>setRevRegModal(false)} onRegister={()=>{}} userVerified={userVerified} onGoVerify={()=>{setRevRegModal(false);setVerifyModal(true);}}/>}
@@ -2056,6 +2140,7 @@ function MainApp({user}) {
       {askModal     &&<AskModal onClose={()=>setAskModal(false)} onSubmit={handleAskSubmit} purchasedBeans={purchasedBeans} onBuyBeans={()=>{setAskModal(false);setBeanModal(true);}}/>}
       {adminModal   &&<AdminPanel onClose={()=>setAdminModal(false)}/>}
       {myPageModal  &&<MyPage onClose={()=>setMyPageModal(false)} user={user} purchasedBeans={purchasedBeans} earnedBeans={earnedBeans} bankAccount={bankAccount} onWithdraw={()=>setWithdrawModal(true)} onCharge={()=>setBeanModal(true)}/>}
+      {refundModal  &&<RefundPolicyModal onClose={()=>setRefundModal(false)}/>}
     </div>
   );
 }
