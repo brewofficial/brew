@@ -152,7 +152,8 @@ function BeanModal({onClose,onBuy,user}) {
     <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.45)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:20}} onClick={onClose}>
       <div style={{background:T.bg,borderRadius:14,padding:"28px 28px 22px",maxWidth:400,width:"100%",boxShadow:"0 16px 48px rgba(28,20,16,0.18)"}} onClick={e=>e.stopPropagation()}>
         <h2 style={{fontFamily:"'Noto Serif KR',serif",fontSize:22,color:T.heading,fontWeight:400,marginBottom:4}}>원두 충전</h2>
-        <p style={{fontSize:13,color:T.muted,marginBottom:20}}>커피챗 신청, 레주메 리뷰 신청에 사용해요.</p>
+        <p style={{fontSize:13,color:T.muted,marginBottom:8}}>커피챗 신청, 레주메 리뷰 신청에 사용해요.</p>
+        <p style={{fontSize:12,color:T.coffee,marginBottom:20,fontWeight:500}}>✓ 결제 즉시 사용 가능</p>
         <div style={{background:T.surface,borderRadius:8,padding:"12px 14px",marginBottom:20,display:"flex",flexDirection:"column",gap:8}}>
           <div style={{display:"flex",alignItems:"center",gap:8}}>
             <span>🫘</span>
