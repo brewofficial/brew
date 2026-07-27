@@ -125,27 +125,63 @@ function Inp({value,onChange,placeholder,type="text",...rest}) {
 
 const Lbl = ({children}) => <label style={{display:"block",fontSize:12,color:T.muted,marginBottom:5,fontWeight:500}}>{children}</label>;
 
-/* ── Bean Modal (토스페이먼츠 연동) ────────────── */
+/* ── Bean Modal (포트원 V1 카카오페이 연동) ────── */
 function BeanModal({onClose,onBuy,user}) {
   const [loading,setLoading]=useState(false);
 
   async function handlePay(pkg) {
     setLoading(true);
     try {
-      const tossPayments = await window.TossPayments(process.env.REACT_APP_TOSS_CLIENT_KEY);
-      await tossPayments.requestPayment("카드", {
+      // 포트원 V1 SDK 로드
+      if(!window.IMP) {
+        alert("결제 모듈을 불러오는 중이에요. 잠시 후 다시 시도해주세요.");
+        setLoading(false);
+        return;
+      }
+      window.IMP.init("imp37345521"); // 고객사 식별코드
+
+      const merchant_uid = `brew_${Date.now()}`;
+
+      window.IMP.request_pay({
+        channelKey: "channel-key-a0b6bb1d-1332-4fb9-99a0-2763146c3d3d",
+        pg: "kakaopay.TC0ONETIME",
+        pay_method: "card",
+        merchant_uid,
+        name: `브루 ${pkg.label} · ${pkg.beans}빈`,
         amount: pkg.price,
-        orderId: `brew_${Date.now()}`,
-        orderName: `브루 ${pkg.label} · ${pkg.beans}빈`,
-        customerName: user?.name || "브루 사용자",
-        customerEmail: user?.email || "",
-        successUrl: `${window.location.origin}/payment/success?beans=${pkg.beans}&price=${pkg.price}&label=${pkg.label}`,
-        failUrl: `${window.location.origin}/payment/fail`,
+        buyer_name: user?.name || "브루 사용자",
+        buyer_email: user?.email || "",
+        m_redirect_url: `${window.location.origin}/payment/success?beans=${pkg.beans}&price=${pkg.price}&label=${encodeURIComponent(pkg.label)}`,
+      }, async (rsp) => {
+        if(rsp.success) {
+          // 결제 성공 — Supabase에 빈 추가
+          const { data: { user: u } } = await supabase.auth.getUser();
+          if(u) {
+            await supabase.rpc("add_purchased_beans", { user_id: u.id, amount: pkg.beans });
+            await supabase.from("bean_transactions").insert({
+              user_id: u.id,
+              type: "charge",
+              amount: pkg.beans,
+              description: `${pkg.label} 충전 (₩${pkg.price.toLocaleString()})`,
+              payment_key: rsp.imp_uid,
+              order_id: merchant_uid,
+            });
+          }
+          onBuy(pkg);
+          alert(`🫘 ${pkg.beans}빈이 충전됐어요!`);
+          onClose();
+        } else {
+          if(rsp.error_msg !== "사용자가 결제를 취소하셨습니다") {
+            alert(`결제 실패: ${rsp.error_msg}`);
+          }
+        }
+        setLoading(false);
       });
     } catch(e) {
-      if(e.code !== "USER_CANCEL") alert("결제 중 오류가 발생했어요. 다시 시도해주세요.");
+      console.error(e);
+      alert("결제 중 오류가 발생했어요.");
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   return (
