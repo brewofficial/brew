@@ -129,16 +129,20 @@ const Lbl = ({children}) => <label style={{display:"block",fontSize:12,color:T.m
 function BeanModal({onClose,onBuy,user}) {
   const [loading,setLoading]=useState(false);
 
+  useEffect(()=>{
+    // 포트원 SDK 초기화
+    if(window.IMP) window.IMP.init("imp37345521");
+  },[]);
+
   async function handlePay(pkg) {
     setLoading(true);
     try {
-      // 포트원 V1 SDK 로드
       if(!window.IMP) {
         alert("결제 모듈을 불러오는 중이에요. 잠시 후 다시 시도해주세요.");
         setLoading(false);
         return;
       }
-      window.IMP.init("imp37345521"); // 고객사 식별코드
+      window.IMP.init("imp37345521");
 
       const merchant_uid = `brew_${Date.now()}`;
 
@@ -1937,6 +1941,17 @@ function AdminPanel({onClose}) {
 
 
 export default function App() {
+  // 포트원 SDK 초기화
+  useEffect(()=>{
+    const timer = setInterval(()=>{
+      if(window.IMP){
+        window.IMP.init("imp37345521");
+        clearInterval(timer);
+      }
+    }, 300);
+    return ()=>clearInterval(timer);
+  },[]);
+
   // 결제 성공/실패 페이지 라우팅
   const path = window.location.pathname;
   if (path === "/payment/success") return <PaymentSuccess/>;
