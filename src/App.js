@@ -147,8 +147,8 @@ function BeanModal({onClose,onBuy,user}) {
       const merchant_uid = `brew_${Date.now()}`;
 
       window.IMP.request_pay({
-        channelKey: "channel-key-a0b6bb1d-1332-4fb9-99a0-2763146c3d3d",
-        pg: "kakaopay.TC0ONETIME",
+        channelKey: "channel-key-ef6b0cf6-187c-47f1-92c6-74828744fdee",
+        pg: "kakaopay.CA08925932",
         pay_method: "card",
         merchant_uid,
         name: `브루 ${pkg.label} · ${pkg.beans}빈`,
