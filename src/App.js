@@ -565,10 +565,132 @@ function VerifyOnlyModal({onClose,onComplete}) {
 }
 
 
-function ProfileCard({p,onSend,purchasedBeans,index}) {
+/* ── Star Rating ────────────────────────────── */
+function StarRating({value=0,onChange=null,size=16}) {
+  const [hover,setHover]=useState(0);
+  return (
+    <div style={{display:"flex",gap:2}}>
+      {[1,2,3,4,5].map(i=>(
+        <span key={i}
+          style={{fontSize:size,cursor:onChange?"pointer":"default",color:(hover||value)>=i?"#f5a623":"#ddd",transition:"color 0.1s"}}
+          onClick={()=>onChange&&onChange(i)}
+          onMouseEnter={()=>onChange&&setHover(i)}
+          onMouseLeave={()=>onChange&&setHover(0)}>★</span>
+      ))}
+    </div>
+  );
+}
+
+/* ── Review Modal ───────────────────────────── */
+function ReviewModal({target,serviceType,currentUserId,onClose}) {
+  const [reviews,setReviews]=useState([]);
+  const [rating,setRating]=useState(0);
+  const [content,setContent]=useState("");
+  const [submitting,setSubmitting]=useState(false);
+  const [submitted,setSubmitted]=useState(false);
+  const [canReview,setCanReview]=useState(false);
+  const [myReview,setMyReview]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const avg=reviews.length>0?(reviews.reduce((s,r)=>s+r.rating,0)/reviews.length).toFixed(1):null;
+
+  useEffect(()=>{
+    async function load(){
+      const {data:revs}=await supabase.from("reviews")
+        .select("*, profiles!reviewer_id(name)")
+        .eq("target_id",target.id)
+        .eq("service_type",serviceType)
+        .order("created_at",{ascending:false});
+      if(revs){
+        setReviews(revs);
+        const mine=revs.find(r=>r.reviewer_id===currentUserId);
+        if(mine) setMyReview(mine);
+      }
+      if(currentUserId&&currentUserId!==target.id){
+        const {data:txns}=await supabase.from("bean_transactions")
+          .select("id").eq("user_id",currentUserId).eq("type","spend");
+        setCanReview(!!(txns&&txns.length>0));
+      }
+      setLoading(false);
+    }
+    load();
+  },[target.id,serviceType,currentUserId]);
+
+  async function handleSubmit(){
+    if(!rating) return;
+    setSubmitting(true);
+    try {
+      await supabase.from("reviews").upsert({
+        reviewer_id:currentUserId, target_id:target.id,
+        service_type:serviceType, rating, content,
+      },{onConflict:"reviewer_id,target_id,service_type"});
+      setSubmitted(true);
+      setReviews(rv=>[...rv.filter(r=>r.reviewer_id!==currentUserId),
+        {reviewer_id:currentUserId,profiles:{name:"나"},rating,content,created_at:new Date().toISOString()}]);
+    } catch(e){console.error(e);}
+    setSubmitting(false);
+  }
+
+  return (
+    <div style={{position:"fixed",inset:0,background:"rgba(28,20,16,0.55)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}} onClick={onClose}>
+      <div style={{background:T.bg,borderRadius:14,padding:"28px",maxWidth:480,width:"100%",maxHeight:"85vh",overflowY:"auto",boxShadow:"0 16px 48px rgba(28,20,16,0.2)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
+          <div>
+            <h3 style={{fontFamily:"'Noto Serif KR',serif",fontSize:18,color:T.heading,fontWeight:400,marginBottom:4}}>{target.name}</h3>
+            <p style={{fontSize:12,color:T.muted}}>{target.role} · {target.company}</p>
+          </div>
+          {avg&&<div style={{textAlign:"right"}}>
+            <div style={{fontSize:22,fontWeight:700,color:T.coffee}}>{avg}</div>
+            <StarRating value={Math.round(avg)} size={13}/>
+            <div style={{fontSize:11,color:T.muted,marginTop:2}}>{reviews.length}개 리뷰</div>
+          </div>}
+        </div>
+
+        {canReview&&!myReview&&!submitted&&(
+          <div style={{background:T.surface,borderRadius:10,padding:"16px",marginBottom:20,border:`1px solid ${T.border}`}}>
+            <p style={{fontSize:13,fontWeight:600,color:T.heading,marginBottom:10}}>리뷰 남기기</p>
+            <div style={{marginBottom:10}}><StarRating value={rating} onChange={setRating} size={24}/></div>
+            <textarea value={content} onChange={e=>setContent(e.target.value)} placeholder="어떤 점이 좋았나요? (선택)" rows={3}
+              style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"9px 12px",fontSize:13,resize:"none",outline:"none",color:T.heading,lineHeight:1.6,boxSizing:"border-box",marginBottom:8}}
+              onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
+            <button onClick={handleSubmit} disabled={!rating||submitting}
+              style={{width:"100%",background:rating?T.coffee:T.tag,border:"none",borderRadius:7,padding:"9px",color:rating?"#fff":T.muted,fontWeight:600,fontSize:13,cursor:rating?"pointer":"not-allowed"}}>
+              {submitting?"등록 중…":"리뷰 등록"}
+            </button>
+          </div>
+        )}
+        {submitted&&<div style={{background:T.greenBg,borderRadius:8,padding:"10px 14px",fontSize:13,color:T.green,marginBottom:16,textAlign:"center"}}>✅ 리뷰가 등록됐어요!</div>}
+
+        {loading?(
+          <div style={{textAlign:"center",color:T.muted,fontSize:13,padding:"20px 0"}}>불러오는 중…</div>
+        ):reviews.length===0?(
+          <div style={{textAlign:"center",color:T.muted,fontSize:13,padding:"20px 0"}}>아직 리뷰가 없어요.</div>
+        ):(
+          <div style={{display:"flex",flexDirection:"column",gap:12}}>
+            {reviews.map((r,i)=>(
+              <div key={i} style={{padding:"12px 0",borderBottom:`1px solid ${T.border}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:13,fontWeight:600,color:T.heading}}>{r.reviewer_id===currentUserId?"나":r.profiles?.name||"익명"}</span>
+                    <StarRating value={r.rating} size={12}/>
+                  </div>
+                  <span style={{fontSize:11,color:T.muted}}>{new Date(r.created_at).toLocaleDateString("ko-KR")}</span>
+                </div>
+                {r.content&&<p style={{fontSize:13,color:T.body,lineHeight:1.6}}>{r.content}</p>}
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={onClose} style={{width:"100%",marginTop:16,background:"none",border:`1px solid ${T.border}`,borderRadius:8,padding:"10px",color:T.muted,fontSize:13,cursor:"pointer"}}>닫기</button>
+      </div>
+    </div>
+  );
+}
+
+function ProfileCard({p,onSend,purchasedBeans,index,currentUserId}) {
   const [open,setOpen]=useState(false);
   const [msg,setMsg]=useState("");
   const [sent,setSent]=useState(false);
+  const [reviewOpen,setReviewOpen]=useState(false);
   return (
     <div className="fade" style={{animationDelay:`${index*0.04}s`,opacity:0,background:T.bg,border:`1px solid ${T.border}`,borderRadius:10,padding:"20px",transition:"box-shadow 0.15s"}}
       onMouseEnter={e=>e.currentTarget.style.boxShadow="0 2px 12px rgba(107,61,30,0.08)"}
@@ -585,6 +707,17 @@ function ProfileCard({p,onSend,purchasedBeans,index}) {
             </span>
           </div>
           <p style={{fontSize:12,color:T.muted,marginTop:2}}>{p.role} · {p.company} · {p.yoe}년</p>
+          {/* 별점 표시 */}
+          {p.avgRating&&(
+            <div style={{display:"flex",alignItems:"center",gap:4,marginTop:4,cursor:"pointer"}} onClick={()=>setReviewOpen(true)}>
+              <StarRating value={Math.round(p.avgRating)} size={12}/>
+              <span style={{fontSize:11,color:T.coffee,fontWeight:600}}>{p.avgRating}</span>
+              <span style={{fontSize:11,color:T.muted}}>({p.reviewCount})</span>
+            </div>
+          )}
+          {!p.avgRating&&(
+            <span onClick={()=>setReviewOpen(true)} style={{fontSize:11,color:T.muted,cursor:"pointer",marginTop:4,display:"inline-block"}}>리뷰 보기</span>
+          )}
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:14}}>{p.skills.map(s=><Tag key={s} label={s}/>)}</div>
@@ -612,21 +745,19 @@ function ProfileCard({p,onSend,purchasedBeans,index}) {
       )):(
         <div style={{textAlign:"center",padding:"9px",background:T.tag,borderRadius:7,fontSize:13,color:T.tagText}}>신청 완료 — 답변을 기다리는 중이에요</div>
       )}
+      {reviewOpen&&<ReviewModal target={p} serviceType="coffeechat" currentUserId={currentUserId} onClose={()=>setReviewOpen(false)}/>}
     </div>
   );
 }
 
 /* ── Reviewer Card ──────────────────────────── */
-function ReviewerCard({r,onRequest,onBuyBeans,purchasedBeans,index,userVerified}) {
+function ReviewerCard({r,onRequest,onBuyBeans,purchasedBeans,index,userVerified,currentUserId}) {
   const [open,setOpen]=useState(false);
   const [file,setFile]=useState(null);
   const [email,setEmail]=useState("");
   const [note,setNote]=useState("");
   const [sent,setSent]=useState(false);
-  const [rated,setRated]=useState(false);
-  const [myRating,setMyRating]=useState(0);
-  const [hoverRating,setHoverRating]=useState(0);
-  const [review,setReview]=useState("");
+  const [reviewOpen,setReviewOpen]=useState(false);
   const canAfford=purchasedBeans>=r.price;
   const canSubmit=canAfford&&file&&email.trim();
   return (
@@ -646,6 +777,12 @@ function ReviewerCard({r,onRequest,onBuyBeans,purchasedBeans,index,userVerified}
             <span style={{background:T.tag,color:T.coffee,fontSize:13,fontWeight:700,padding:"3px 12px",borderRadius:20,border:`1px solid ${T.border}`}}>🫘 {r.price}빈</span>
           </div>
           <p style={{fontSize:12,color:T.muted,marginTop:2}}>{r.company} · {r.yoe}년차</p>
+          {/* 별점 클릭 → 리뷰 모달 */}
+          <div style={{display:"flex",alignItems:"center",gap:4,marginTop:4,cursor:"pointer"}} onClick={()=>setReviewOpen(true)}>
+            <StarRating value={Math.round(r.rating||5)} size={12}/>
+            <span style={{fontSize:11,color:T.coffee,fontWeight:600}}>{(r.rating||5).toFixed(1)}</span>
+            <span style={{fontSize:11,color:T.muted}}>({r.reviews||r.review_count||0}건)</span>
+          </div>
         </div>
       </div>
       <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:12}}>{r.tags.map(t=><Tag key={t} label={t} small/>)}</div>
@@ -708,43 +845,11 @@ function ReviewerCard({r,onRequest,onBuyBeans,purchasedBeans,index,userVerified}
           {canAfford?`📄 레주메 리뷰 신청 · ${r.price}빈`:`🫘 빈 충전하기 (${r.price}빈 필요)`}
         </button>
       )):(
-        !rated ? (
-          <div style={{display:"flex",flexDirection:"column",gap:10}}>
-            <div style={{textAlign:"center",padding:"10px",background:T.greenBg,borderRadius:7,fontSize:13,color:T.green,fontWeight:500}}>
-              ✅ 신청 완료 — {r.turnaround} 내 <strong>{email}</strong>으로 피드백이 도착해요
-            </div>
-            {/* 평점 남기기 */}
-            <div style={{background:T.surface,borderRadius:9,padding:"14px 16px"}}>
-              <p style={{fontSize:12,color:T.muted,marginBottom:10,fontWeight:500}}>피드백을 받으셨나요? 평점을 남겨주세요</p>
-              {/* 별점 */}
-              <div style={{display:"flex",gap:4,marginBottom:10}}>
-                {[1,2,3,4,5].map(star=>(
-                  <span key={star}
-                    onClick={()=>setMyRating(star)}
-                    onMouseEnter={()=>setHoverRating(star)}
-                    onMouseLeave={()=>setHoverRating(0)}
-                    style={{fontSize:26,cursor:"pointer",color:(hoverRating||myRating)>=star?"#f5a623":"#e0d0bc",transition:"color 0.1s"}}>★</span>
-                ))}
-                {myRating>0&&<span style={{fontSize:12,color:T.muted,marginLeft:4,alignSelf:"center"}}>{["","별로예요","아쉬워요","보통이에요","좋아요","최고예요"][myRating]}</span>}
-              </div>
-              {myRating>0&&(
-                <>
-                  <textarea value={review} onChange={e=>setReview(e.target.value)} placeholder="한 줄 후기를 남겨주세요 (선택)" rows={2}
-                    style={{width:"100%",border:`1px solid ${T.border}`,borderRadius:7,padding:"8px 10px",fontSize:12,resize:"none",outline:"none",color:T.heading,lineHeight:1.5,boxSizing:"border-box"}}
-                    onFocus={e=>e.target.style.borderColor=T.coffee} onBlur={e=>e.target.style.borderColor=T.border}/>
-                  <button onClick={()=>setRated(true)} style={{width:"100%",marginTop:8,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>
-                    평점 등록
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        ):(
-          <div style={{textAlign:"center",padding:"10px",background:T.tag,borderRadius:7,fontSize:13,color:T.tagText}}>
-            {"★".repeat(myRating)}{"☆".repeat(5-myRating)} 평점이 등록됐어요. 감사해요!
-          </div>
-        )
+        <div style={{textAlign:"center",padding:"10px",background:T.greenBg,borderRadius:7,fontSize:13,color:T.green,fontWeight:500}}>
+          ✅ 신청 완료 — {r.turnaround} 내 <strong>{email}</strong>으로 피드백이 도착해요
+        </div>
       )}
+      {reviewOpen&&<ReviewModal target={{...r,id:r.user_id||r.id}} serviceType="resume" currentUserId={currentUserId} onClose={()=>setReviewOpen(false)}/>}
     </div>
   );
 }
@@ -2284,7 +2389,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onSend={()=>handleSend()} purchasedBeans={purchasedBeans} index={i}/>)}
+              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onSend={()=>handleSend()} purchasedBeans={purchasedBeans} index={i} currentUserId={user?.id}/>)}
             </div>
           </>
         )}
@@ -2311,7 +2416,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {filtRev.map((r,i)=><ReviewerCard key={r.id} r={r} onRequest={handleReviewReq} onBuyBeans={()=>setBeanModal(true)} purchasedBeans={purchasedBeans} index={i} userVerified={userVerified}/>)}
+              {filtRev.map((r,i)=><ReviewerCard key={r.id} r={r} onRequest={handleReviewReq} onBuyBeans={()=>setBeanModal(true)} purchasedBeans={purchasedBeans} index={i} userVerified={userVerified} currentUserId={user?.id}/>)}
             </div>
           </>
         )}
