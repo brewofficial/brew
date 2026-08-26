@@ -606,9 +606,17 @@ function ReviewModal({target,serviceType,currentUserId,onClose}) {
         if(mine) setMyReview(mine);
       }
       if(currentUserId&&currentUserId!==target.id){
-        const {data:txns}=await supabase.from("bean_transactions")
-          .select("id").eq("user_id",currentUserId).eq("type","spend");
-        setCanReview(!!(txns&&txns.length>0));
+        // 커피챗: 완료된 신청이 있어야 리뷰 가능
+        // 레주메: 신청 이력이 있으면 리뷰 가능
+        if(serviceType==="coffeechat"){
+          const {data:reqs}=await supabase.from("coffeechat_requests")
+            .select("id").eq("requester_id",currentUserId).eq("target_id",target.id).eq("status","completed");
+          setCanReview(!!(reqs&&reqs.length>0));
+        } else {
+          const {data:txns}=await supabase.from("bean_transactions")
+            .select("id").eq("user_id",currentUserId).eq("type","spend");
+          setCanReview(!!(txns&&txns.length>0));
+        }
       }
       setLoading(false);
     }
@@ -733,7 +741,7 @@ function ProfileCard({p,onSend,purchasedBeans,index,currentUserId}) {
             {p.verified&&<span style={{color:T.green,marginLeft:4}}>✓ 인증 회원은 답장 확률이 높아요.</span>}
           </div>
           <div style={{display:"flex",gap:7}}>
-            <button onClick={async()=>{const ok=await onSend();if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 2빈</button>
+            <button onClick={async()=>{const ok=await onSend(p, msg);if(ok)setSent(true);}} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"9px",color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer"}}>신청 보내기 · 2빈</button>
             <button onClick={()=>setOpen(false)} style={{background:T.tag,border:"none",borderRadius:7,padding:"9px 14px",color:T.body,fontSize:13,cursor:"pointer"}}>취소</button>
           </div>
         </div>
@@ -1356,6 +1364,7 @@ function RefundPolicyModal({onClose}) {
 function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,onCharge}) {
   const [tab,setTab]=useState("beans");
   const [verifyNotifs,setVerifyNotifs]=useState([]);
+  const [incomingRequests,setIncomingRequests]=useState([]);
   const [refundOpen,setRefundOpen]=useState(false);
   const [refundableCharges,setRefundableCharges]=useState([]);
   const [refundDone,setRefundDone]=useState(null); // {type:"auto"|"review", amount}
@@ -1367,9 +1376,16 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
       const {data}=await supabase.from("bean_transactions")
         .select("*")
         .eq("user_id",user.id)
-        .in("type",["verify_approved","verify_rejected"])
+        .in("type",["verify_approved","verify_rejected","review_request"])
         .order("created_at",{ascending:false});
       if(data) setVerifyNotifs(data);
+
+      // 받은 커피챗 신청 (내가 현직자인 경우)
+      const {data:reqs}=await supabase.from("coffeechat_requests")
+        .select("*, profiles!requester_id(name,role,company)")
+        .eq("target_id",user.id)
+        .order("created_at",{ascending:false});
+      if(reqs) setIncomingRequests(reqs);
     }
     loadNotifs();
   },[user?.id]);
@@ -1547,6 +1563,7 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
           <button style={tabStyle("coffee")} onClick={()=>setTab("coffee")}>☕</button>
           <button style={tabStyle("resume")} onClick={()=>setTab("resume")}>📄</button>
           <button style={tabStyle("answers")} onClick={()=>setTab("answers")}>💬</button>
+          <button style={tabStyle("requests")} onClick={()=>setTab("requests")}>📬</button>
         </div>
 
         {/* Content */}
@@ -1557,10 +1574,10 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
             <div style={{display:"flex",flexDirection:"column",gap:12}}>
               {/* 인증 알림 */}
               {verifyNotifs.map(n=>(
-                <div key={n.id} style={{background:n.type==="verify_approved"?T.greenBg:"#fff5f5",borderRadius:10,padding:"14px 16px",border:`1px solid ${n.type==="verify_approved"?T.green:"#fca5a5"}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
+                <div key={n.id} style={{background:n.type==="verify_approved"?T.greenBg:n.type==="review_request"?"#fdf8ec":"#fff5f5",borderRadius:10,padding:"14px 16px",border:`1px solid ${n.type==="verify_approved"?T.green:n.type==="review_request"?"#f0dfa0":"#fca5a5"}`,display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10}}>
                   <div>
-                    <div style={{fontSize:13,fontWeight:600,color:n.type==="verify_approved"?T.green:T.red,marginBottom:4}}>
-                      {n.type==="verify_approved"?"✅ 인증 승인":"❌ 인증 거절"}
+                    <div style={{fontSize:13,fontWeight:600,color:n.type==="verify_approved"?T.green:n.type==="review_request"?T.coffee:T.red,marginBottom:4}}>
+                      {n.type==="verify_approved"?"✅ 인증 승인":n.type==="review_request"?"☕ 커피챗 완료":"❌ 인증 거절"}
                     </div>
                     <div style={{fontSize:12,color:T.body,lineHeight:1.6}}>{n.description?.replace("인증이 승인됐어요! ","").replace("인증이 거절됐어요. 사유: ","")}</div>
                   </div>
@@ -1664,6 +1681,54 @@ function MyPage({onClose,user,purchasedBeans,earnedBeans,bankAccount,onWithdraw,
                       :<span style={{fontSize:11,color:T.muted}}>채택 시 🫘 {a.bounty}빈</span>
                     }
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* 받은 커피챗 신청 (현직자용) */}
+          {tab==="requests"&&(
+            <div style={{display:"flex",flexDirection:"column",gap:10}}>
+              <div style={{fontSize:12,color:T.muted,marginBottom:4}}>총 {incomingRequests.length}건</div>
+              {incomingRequests.length===0?(
+                <div style={{textAlign:"center",color:T.muted,fontSize:13,padding:"30px 0"}}>받은 커피챗 신청이 없어요.</div>
+              ):incomingRequests.map(req=>(
+                <div key={req.id} style={{background:T.surface,borderRadius:10,padding:"14px 16px",border:`1px solid ${req.status==="completed"?T.green:T.border}`}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:10,marginBottom:8}}>
+                    <div>
+                      <div style={{fontSize:13,fontWeight:600,color:T.heading}}>{req.profiles?.name||"익명"}</div>
+                      <div style={{fontSize:12,color:T.muted}}>{req.profiles?.role} · {req.profiles?.company}</div>
+                    </div>
+                    <span style={{fontSize:11,padding:"3px 9px",borderRadius:20,fontWeight:600,flexShrink:0,
+                      background:req.status==="completed"?T.greenBg:req.status==="rejected"?"#fee":T.tag,
+                      color:req.status==="completed"?T.green:req.status==="rejected"?T.red:T.tagText}}>
+                      {req.status==="completed"?"✅ 완료":req.status==="rejected"?"거절":"대기 중"}
+                    </span>
+                  </div>
+                  {req.message&&<p style={{fontSize:12,color:T.body,lineHeight:1.6,marginBottom:10,padding:"8px 10px",background:T.bg,borderRadius:6}}>{req.message}</p>}
+                  <div style={{fontSize:11,color:T.muted,marginBottom:req.status==="pending"?10:0}}>{new Date(req.created_at).toLocaleDateString("ko-KR")}</div>
+                  {req.status==="pending"&&(
+                    <div style={{display:"flex",gap:8}}>
+                      <button onClick={async()=>{
+                        await supabase.from("coffeechat_requests").update({status:"completed",completed_at:new Date().toISOString()}).eq("id",req.id);
+                        // 신청자에게 리뷰 요청 알림
+                        await supabase.from("bean_transactions").insert({
+                          user_id:req.requester_id, type:"review_request", amount:0,
+                          description:`커피챗 완료! ${user?.name||"현직자"}님과의 커피챗이 완료됐어요. 리뷰를 남겨주세요.`,
+                        });
+                        sendNotification("☕ 커피챗 완료","리뷰를 남겨주세요!");
+                        setIncomingRequests(rs=>rs.map(r=>r.id===req.id?{...r,status:"completed"}:r));
+                      }} style={{flex:1,background:T.coffee,border:"none",borderRadius:7,padding:"8px",color:"#fff",fontWeight:600,fontSize:12,cursor:"pointer"}}>
+                        ✅ 완료 처리
+                      </button>
+                      <button onClick={async()=>{
+                        await supabase.from("coffeechat_requests").update({status:"rejected"}).eq("id",req.id);
+                        setIncomingRequests(rs=>rs.map(r=>r.id===req.id?{...r,status:"rejected"}:r));
+                      }} style={{background:T.tag,border:`1px solid ${T.border}`,borderRadius:7,padding:"8px 14px",color:T.muted,fontSize:12,cursor:"pointer"}}>
+                        거절
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2229,9 +2294,17 @@ function MainApp({user}) {
     if(!isFree) spendBeans(BEANS_PER_VIEW);
   }
 
-  async function handleSend(){
+  async function handleSend(targetProfile, message){
     if(purchasedBeans<BEANS_PER_SEND){setBeanModal(true);return false;}
     const ok = await spendBeans(BEANS_PER_SEND);
+    if(ok && targetProfile?.id){
+      await supabase.from("coffeechat_requests").insert({
+        requester_id: user.id,
+        target_id: targetProfile.id,
+        message: message||"",
+        status: "pending",
+      });
+    }
     return ok;
   }
 
@@ -2389,7 +2462,7 @@ function MainApp({user}) {
               ))}
             </div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(290px,1fr))",gap:14}}>
-              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onSend={()=>handleSend()} purchasedBeans={purchasedBeans} index={i} currentUserId={user?.id}/>)}
+              {sorted.map((p,i)=><ProfileCard key={p.id} p={p} onSend={(target,msg)=>handleSend(target,msg)} purchasedBeans={purchasedBeans} index={i} currentUserId={user?.id}/>)}
             </div>
           </>
         )}
